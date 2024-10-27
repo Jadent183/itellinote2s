@@ -1,6 +1,8 @@
 import { SpeechClient } from '@google-cloud/speech';
+import { TranslationServiceClient } from '@google-cloud/translate';
 
 let speechClient;
+let translationClient;
 
 try {
   speechClient = new SpeechClient({
@@ -10,14 +12,34 @@ try {
     },
     projectId: process.env.GOOGLE_PROJECT_ID,
   });
+
+  translationClient = new TranslationServiceClient({
+    credentials: {
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+    },
+  });
 } catch (error) {
-  console.error('Error initializing Speech Client:', error);
+  console.error('Error initializing clients:', error);
 }
 
+const LANGUAGE_MAPPING = {
+  'en-US': 'en',
+  'es-ES': 'es',
+  'fr-FR': 'fr',
+  'de-DE': 'de',
+  'it-IT': 'it',
+  'pt-PT': 'pt',
+  'ru-RU': 'ru',
+  'ja-JP': 'ja',
+  'ko-KR': 'ko',
+  'zh': 'zh',
+};
+
 export async function POST(req) {
-  if (!speechClient) {
+  if (!speechClient || !translationClient) {
     return new Response(
-      JSON.stringify({ error: 'Speech client not properly initialized' }),
+      JSON.stringify({ error: 'API clients not properly initialized' }),
       { status: 500 }
     );
   }
@@ -25,7 +47,8 @@ export async function POST(req) {
   try {
     const data = await req.formData();
     const audio = data.get('audio');
-    const languageCode = data.get('language') || 'en-US';
+    const inputLanguage = data.get('inputLanguage') || 'en-US';
+    const outputLanguage = data.get('outputLanguage') || 'en-US';
 
     if (!audio) {
       return new Response(
@@ -36,8 +59,7 @@ export async function POST(req) {
 
     const buffer = Buffer.from(await audio.arrayBuffer());
 
-    // Check buffer size - limit to 15 seconds of audio
-    const maxSize = 1024 * 1024; // 1MB max size
+    const maxSize = 1024 * 1024;
     if (buffer.length > maxSize) {
       return new Response(
         JSON.stringify({ error: 'Audio chunk too large' }),
@@ -45,22 +67,21 @@ export async function POST(req) {
       );
     }
 
-    const request = {
+    // Transcribe the audio in the input language
+    const transcribeRequest = {
       audio: {
         content: buffer.toString('base64'),
       },
       config: {
         encoding: 'WEBM_OPUS',
         sampleRateHertz: 48000,
-        languageCode: languageCode,
+        languageCode: inputLanguage,
         model: 'default',
         enableAutomaticPunctuation: true,
         useEnhanced: true,
         maxAlternatives: 1,
         profanityFilter: false,
         enableWordTimeOffsets: false,
-        enableAutomaticPunctuation: true,
-        useEnhanced: true,
         metadata: {
           interactionType: 'DICTATION',
           microphoneDistance: 'NEARFIELD',
@@ -69,17 +90,52 @@ export async function POST(req) {
       },
     };
 
-    const [response] = await speechClient.recognize(request);
-
-    let finalTranscription = '';
-    if (response.results && response.results.length > 0) {
-      finalTranscription = response.results
+    const [transcribeResponse] = await speechClient.recognize(transcribeRequest);
+    let originalTranscription = '';
+    
+    if (transcribeResponse.results && transcribeResponse.results.length > 0) {
+      originalTranscription = transcribeResponse.results
         .map(result => result.alternatives[0].transcript)
         .join(' ');
     }
 
+    // If input and output languages are the same or transcription is empty, return the transcription
+    if (inputLanguage === outputLanguage || !originalTranscription) {
+      return new Response(
+        JSON.stringify({ 
+          transcription: originalTranscription,
+          inputLanguage,
+          outputLanguage
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+          },
+        }
+      );
+    }
+
+    // Translate the transcription to the target language
+    const translateRequest = {
+      parent: `projects/${process.env.GOOGLE_PROJECT_ID}/locations/global`,
+      contents: [originalTranscription],
+      mimeType: 'text/plain',
+      sourceLanguageCode: LANGUAGE_MAPPING[inputLanguage] || 'en',
+      targetLanguageCode: LANGUAGE_MAPPING[outputLanguage] || 'en',
+    };
+
+    const [translateResponse] = await translationClient.translateText(translateRequest);
+    const translatedText = translateResponse.translations[0].translatedText;
+
     return new Response(
-      JSON.stringify({ transcription: finalTranscription }),
+      JSON.stringify({ 
+        transcription: translatedText,
+        originalText: originalTranscription,
+        inputLanguage,
+        outputLanguage
+      }),
       {
         status: 200,
         headers: {
@@ -88,12 +144,14 @@ export async function POST(req) {
         },
       }
     );
+
   } catch (error) {
-    console.error('Detailed transcription error:', error);
+    console.error('Detailed error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: error.details || 'Unknown error occurred'
+        details: error.details || 'Unknown error occurred',
+        errorStack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       }),
       { 
         status: 500,

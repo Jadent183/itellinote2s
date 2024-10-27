@@ -1,31 +1,47 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Languages } from 'lucide-react';
+import { Mic, MicOff, Languages, ArrowRight } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import LanguageSelector from './LanguageSelector';
 
+const CHUNK_INTERVAL = 5000;
+
 const SpeechTranscription = () => {
   const [isRecording, setIsRecording] = useState(false);
-  const [transcription, setTranscription] = useState('');
+  const [transcriptions, setTranscriptions] = useState([]);
+  const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [inputLanguage, setInputLanguage] = useState('en-US');
+  const [outputLanguage, setOutputLanguage] = useState('en-US');
   
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
+  const chunkIntervalRef = useRef(null);
+  const isProcessingRef = useRef(false);
 
+
+  
   const processAudioChunk = async (audioBlob) => {
+    if (isProcessingRef.current) return;
+    
     try {
+      isProcessingRef.current = true;
       setIsProcessing(true);
-      console.log('Processing audio chunk:', audioBlob.size, 'bytes');
+      
+      if (audioBlob.size < 1000) {
+        console.log('Skipping small audio chunk');
+        return;
+      }
 
       const formData = new FormData();
       formData.append('audio', audioBlob);
-      formData.append('language', selectedLanguage);
+      formData.append('inputLanguage', inputLanguage);
+      formData.append('outputLanguage', outputLanguage);
 
       const response = await fetch('/api/transcribe', {
         method: 'POST',
@@ -37,24 +53,47 @@ const SpeechTranscription = () => {
       }
 
       const data = await response.json();
-      console.log('Transcription received:', data.transcription);
+      console.log('Response received:', data);
       
       if (data.transcription && data.transcription.trim()) {
-        setTranscription(data.transcription.trim());
+        setTranscriptions(prev => [...prev, {
+          text: data.transcription.trim(),
+          timestamp: new Date().toISOString(),
+        }]);
+        
+        if (data.originalText) {
+          setOriginalTranscriptions(prev => [...prev, {
+            text: data.originalText.trim(),
+            timestamp: new Date().toISOString(),
+          }]);
+        }
       }
     } catch (err) {
       console.error('Processing error:', err);
       setError(err.message);
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
 
+
+
+  const collectAndProcessChunk = () => {
+    if (chunksRef.current.length === 0) return;
+    
+    const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
+    chunksRef.current = []; // Clear the chunks array
+    processAudioChunk(audioBlob);
+  };
+
+
+
   const startRecording = async () => {
     try {
       setError('');
-      setTranscription('');
       chunksRef.current = [];
+      setTranscriptions([]);
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -80,19 +119,29 @@ const SpeechTranscription = () => {
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
+      const startNewRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
         }
+
+        const newRecorder = new MediaRecorder(stream, options);
+        newRecorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            chunksRef.current.push(event.data);
+          }
+        };
+
+        newRecorder.onstop = collectAndProcessChunk;
+        
+        mediaRecorderRef.current = newRecorder;
+        newRecorder.start();
       };
 
-      mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
-        await processAudioChunk(audioBlob);
-        chunksRef.current = [];
-      };
+      chunkIntervalRef.current = setInterval(() => {
+        startNewRecording();
+      }, CHUNK_INTERVAL);
 
-      mediaRecorder.start(100);
+      startNewRecording();
       setIsRecording(true);
       console.log('Recording started');
     } catch (err) {
@@ -101,7 +150,14 @@ const SpeechTranscription = () => {
     }
   };
 
+
+
   const stopRecording = useCallback(() => {
+    if (chunkIntervalRef.current) {
+      clearInterval(chunkIntervalRef.current);
+      chunkIntervalRef.current = null;
+    }
+
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
@@ -114,22 +170,63 @@ const SpeechTranscription = () => {
     setIsRecording(false);
   }, []);
 
+
+
   const handleLanguageChange = (langCode) => {
     setSelectedLanguage(langCode);
     if (isRecording) {
       stopRecording();
     }
-    setTranscription('');
+    setTranscriptions([]);
   };
+
+
+
+  useEffect(() => {
+    return () => {
+      if (chunkIntervalRef.current) {
+        clearInterval(chunkIntervalRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+
+
+const handleInputLanguageChange = (langCode) => {
+    setInputLanguage(langCode);
+    if (isRecording) {
+      stopRecording();
+    }
+    setTranscriptions([]);
+    setOriginalTranscriptions([]);
+  };
+
+
+
+  const handleOutputLanguageChange = (langCode) => {
+    setOutputLanguage(langCode);
+    if (isRecording) {
+      stopRecording();
+    }
+    setTranscriptions([]);
+    setOriginalTranscriptions([]);
+  };
+
+
 
   return (
     <div className="max-w-4xl mx-auto p-4">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            <span>Speech Transcription</span>
+            <span>Real-time Speech Transcription & Translation</span>
             <div className="flex items-center gap-4">
-              <LanguageSelector onLanguageChange={handleLanguageChange} />
               <Languages className="h-6 w-6 text-gray-500" />
             </div>
           </CardTitle>
@@ -142,12 +239,23 @@ const SpeechTranscription = () => {
           )}
           
           <div className="space-y-4">
-            <div className="flex justify-center">
+            <div className="flex items-center justify-center gap-4">
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Input Language</p>
+                <LanguageSelector onLanguageChange={handleInputLanguageChange} defaultValue={inputLanguage} />
+              </div>
+              <ArrowRight className="h-4 w-4 mt-6 text-gray-400" />
+              <div>
+                <p className="text-sm text-gray-500 mb-1">Output Language</p>
+                <LanguageSelector onLanguageChange={handleOutputLanguageChange} defaultValue={outputLanguage} />
+              </div>
+            </div>
+
+            <div className="flex justify-center mt-4">
               <Button 
                 onClick={isRecording ? stopRecording : startRecording}
                 variant={isRecording ? "destructive" : "default"}
                 className="flex items-center gap-2"
-                disabled={isProcessing}
               >
                 {isRecording ? (
                   <>
@@ -163,16 +271,55 @@ const SpeechTranscription = () => {
               </Button>
             </div>
 
-            <div className="min-h-48 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-lg font-semibold mb-2">Transcription:</h3>
-              {isProcessing && (
-                <div className="flex items-center gap-2 text-gray-500 italic mb-2">
-                  <span className="animate-pulse">Processing audio...</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {inputLanguage !== outputLanguage && (
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-lg font-semibold mb-2">
+                    Original ({inputLanguage}):
+                  </h3>
+                  {isProcessing && (
+                    <div className="flex items-center gap-2 text-gray-500 italic mb-2">
+                      <span className="animate-pulse">Processing audio...</span>
+                    </div>
+                  )}
+                  <div className="whitespace-pre-wrap space-y-2">
+                    {originalTranscriptions.length > 0 ? (
+                      originalTranscriptions.map((transcript) => (
+                        <p key={transcript.timestamp}>
+                          {transcript.text}
+                        </p>
+                      ))
+                    ) : (
+                      'Original transcription will appear here...'
+                    )}
+                  </div>
                 </div>
               )}
-              <p className="whitespace-pre-wrap">
-                {transcription || 'Your transcription will appear here...'}
-              </p>
+
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-semibold mb-2">
+                  {inputLanguage === outputLanguage ? 
+                    'Transcription:' : 
+                    `Translation (${outputLanguage}):`
+                  }
+                </h3>
+                {isProcessing && (
+                  <div className="flex items-center gap-2 text-gray-500 italic mb-2">
+                    <span className="animate-pulse">Processing audio...</span>
+                  </div>
+                )}
+                <div className="whitespace-pre-wrap space-y-2">
+                  {transcriptions.length > 0 ? (
+                    transcriptions.map((transcript) => (
+                      <p key={transcript.timestamp}>
+                        {transcript.text}
+                      </p>
+                    ))
+                  ) : (
+                    'Transcription will appear here...'
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </CardContent>
