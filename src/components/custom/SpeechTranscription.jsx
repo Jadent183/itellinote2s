@@ -261,35 +261,62 @@ const handleInputLanguageChange = (langCode) => {
 
 
 const lectureData = {
-    "content": [
-      "Introduction:",
-      "Binary Search is a fundamental, efficient search algorithm for sorted arrays or lists.",
-      "It offers a time complexity of O(log n), significantly faster than linear search.",
-      "Basic Idea:",
-      "Instead of examining each element, Binary Search divides the list in half to reduce the search space.",
-      "Search Process:",
-      "1. Identify the Middle Element: Calculate the midpoint using (low + high) / 2.",
-      "2. Comparison: If the target equals the middle element, the search is complete.",
-      "   - If smaller, search continues in the left half.",
-      "   - If larger, focus shifts to the right half.",
-      "3. Repeat: Halving continues until the target is found or no search space remains.",
-      "Example:",
-      "For the sorted list [1, 3, 5, 7, 9, 11, 13, 15]:",
-      "Searching for 9 involved comparisons with elements 7, 11, and finally 9. Found in 3 comparisons, showing efficiency over linear search.",
-      "Efficiency:",
-      "Demonstrates the power of Binary Search, utilizing a divide-and-conquer strategy to achieve O(log n) time complexity."
-    ],
-    "data-structures": [
-        {
-          type: "array",
-          initialValues: [3, 8, 1, 4, 6]
-        },
-        {
-          type: "bst",
-          initialValues: [1, 2, 3, 4, 5]
-        }
-      ],
-    "subject": "Binary Search"
+    // "content": [
+    //   "Introduction:",
+    //   "The lecture covers two essential search algorithms: Linear Search and Binary Search.",
+    //   "Linear Search:",
+    //   "Description:",
+    //   "Checks each element in sequence until target is found or end is reached.",
+    //   "Advantages:",
+    //   "Best suited for unsorted data as no ordering is required.",
+    //   "Example:",
+    //   "Searching for 19 in [12, 4, 8, 19, 7, 5].",
+    //   "Steps: Comparisons made with 12, 4, 8, then 19 (found at index 3, after 4 comparisons).",
+    //   "Performance:",
+    //   "Time complexity: O(n) in the worst case.",
+    //   "Binary Search:",
+    //   "Description:",
+    //   "Requires a sorted array and utilizes a divide-and-conquer approach.",
+    //   "Example:",
+    //   "Searching for 14 in [2, 5, 7, 10, 14, 18, 21, 25].",
+    //   "Steps: Identify the middle element (10, index 3), compare and halve the search space. Narrow to [14, 18, 21, 25], then [14] (found at index 4, after 3 comparisons).",
+    //   "Performance:",
+    //   "Time complexity: O(log n), more efficient for large, sorted datasets.",
+    //   "Comparison and Use Cases:",
+    //   "Recommendations:",
+    //   "Use Linear Search for unsorted data or data structures like linked lists.",
+    //   "Use Binary Search for fast searching in sorted arrays or lists.",
+    //   "Next Steps:",
+    //   "Practice implementing these algorithms in code.",
+    //   "Discuss scenarios favoring each approach."
+    // ],
+    // "data-structures": [
+    //   {
+    //     "type": "array",
+    //     "initialValues": [
+    //       12,
+    //       4,
+    //       8,
+    //       19,
+    //       7,
+    //       5
+    //     ]
+    //   },
+    //   {
+    //     "type": "bst",
+    //     "initialValues": [
+    //       2,
+    //       5,
+    //       7,
+    //       10,
+    //       14,
+    //       18,
+    //       21,
+    //       25
+    //     ]
+    //   }
+    // ],
+    // "subject": "Linear Search vs. Binary Search"
   };
 
 
@@ -396,27 +423,15 @@ const lectureData = {
             </div>
           </div>
         </CardContent>
-
-
-
-
       </Card>
-
+                  {/* Spacer */}
       <div className="max-w-4xl mx-auto p-4" />
 
-
+                  {/* Notes Data */}
       <Card>
-
-          <CardContent>
-                    <DynamicLectureNotes lectureData={lectureData}/>
-              {/* <LectureNotesVisualizer /> */}
-              {/* <DataStructureVisualizer
-                  type="bst"
-                  defaultValues="11,4,8,1,9"  // Values will be automatically sorted
-                  name="Binary Search Tree"
-                  /> */}
-
-            </CardContent>
+        <CardContent>
+            <DynamicLectureNotes lectureData={lectureData}/>
+        </CardContent>
       </Card>
     </div>
   );

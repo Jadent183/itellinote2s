@@ -6,55 +6,61 @@ const isHeader = (line) => {
   return line.endsWith(':');
 };
 
-const formatContent = (content) => {
-  const sections = [];
-  let currentSection = null;
-
-  content.forEach((line) => {
-    if (isHeader(line)) {
+const formatContent = (content = []) => {
+    try {
+      const sections = [];
+      let currentSection = null;
+  
+      content.forEach((line) => {
+        if (isHeader(line)) {
+          if (currentSection) {
+            sections.push(currentSection);
+          }
+          currentSection = {
+            title: line.replace(':', ''),
+            content: []
+          };
+        } else if (currentSection) {
+          if (/^\d+\./.test(line)) {
+            const [number, ...restOfLine] = line.split('. ');
+            const stepContent = restOfLine.join('. ');
+  
+            if (stepContent.includes(':')) {
+              const [title, description] = stepContent.split(': ');
+              currentSection.content.push({
+                type: 'numbered',
+                number: number,
+                title: title,
+                description: description
+              });
+            } else {
+              currentSection.content.push({
+                type: 'numbered',
+                number: number,
+                content: stepContent
+              });
+            }
+          } else {
+            currentSection.content.push({
+              type: 'bullet',
+              content: line
+            });
+          }
+        }
+      });
+  
       if (currentSection) {
         sections.push(currentSection);
       }
-      currentSection = {
-        title: line.replace(':', ''),
-        content: []
-      };
-    } else if (currentSection) {
-      if (/^\d+\./.test(line)) {
-        const [number, ...restOfLine] = line.split('. ');
-        const stepContent = restOfLine.join('. ');
-        
-        if (stepContent.includes(':')) {
-          const [title, description] = stepContent.split(': ');
-          currentSection.content.push({
-            type: 'numbered',
-            number: number,
-            title: title,
-            description: description
-          });
-        } else {
-          currentSection.content.push({
-            type: 'numbered',
-            number: number,
-            content: stepContent
-          });
-        }
-      } else {
-        currentSection.content.push({
-          type: 'bullet',
-          content: line
-        });
-      }
+  
+      return sections;
+    } catch (error) {
+        console.error('Error in formatContent:', error);
+        throw error;
     }
-  });
-
-  if (currentSection) {
-    sections.push(currentSection);
-  }
-
-  return sections;
-};
-
+  };
+  
+  
 // Helper function to normalize data structure format
 const normalizeDataStructures = (dataStructures) => {
     if (!dataStructures) return [];
