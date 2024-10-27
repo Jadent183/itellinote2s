@@ -1,4 +1,3 @@
-// src/components/SpeechTranscriptionClient.jsx
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
@@ -8,12 +7,11 @@ import LectureNotesCard from './notes/LectureNotesCard';
 import { useAudioProcessing } from '@/hooks/useAudioProcessing';
 import { useGPTProcessing } from '@/hooks/useGPTProcessing';
 
+
 const SpeechTranscriptionClient = () => {
   // Basic state
   const [transcriptions, setTranscriptions] = useState([]);
   const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
-  const [notesData, setNotesData] = useState(null);
-  const [isProcessingNotes, setIsProcessingNotes] = useState(false);
   const [inputLanguage, setInputLanguage] = useState('en-US');
   const [outputLanguage, setOutputLanguage] = useState('en-US');
 
@@ -23,10 +21,13 @@ const SpeechTranscriptionClient = () => {
   // Use the GPT processing hook
   const { 
     isProcessingGPT, 
+    isProcessingNotes,
     gptResponse, 
+    notesData,
     processWithGPT,
     threadId 
   } = useGPTProcessing();
+
 
   // Schedule GPT processing
   const scheduleGPTProcessing = useCallback((text) => {
