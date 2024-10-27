@@ -1,6 +1,5 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
-import TypewriterText from './TypewriterText';
 
 const TranscriptionDisplay = ({
   inputLanguage,
@@ -11,12 +10,6 @@ const TranscriptionDisplay = ({
 }) => {
   const showOriginal = inputLanguage !== outputLanguage;
 
-  // Get the latest transcription text
-  const getLatestTranscription = (items) => {
-    const latest = items[items.length - 1];
-    return latest ? latest.text : '';
-  };
-
   return (
     <div className="grid gap-4">
       {/* Original Text Display */}
@@ -25,16 +18,9 @@ const TranscriptionDisplay = ({
           <h3 className="text-sm font-medium mb-2">Original Text</h3>
           <div className="space-y-2">
             {originalTranscriptions.map((item, index) => (
-              <div key={item.timestamp} className="text-gray-600">
-                {index === originalTranscriptions.length - 1 ? (
-                  <TypewriterText 
-                    text={item.text}
-                    onComplete={() => console.log('Original text complete')}
-                  />
-                ) : (
-                  <p>{item.text}</p>
-                )}
-              </div>
+              <p key={item.timestamp} className="text-gray-600">
+                {item.text}
+              </p>
             ))}
           </div>
           {isProcessing && (
@@ -43,23 +29,16 @@ const TranscriptionDisplay = ({
         </Card>
       )}
 
-      {/* Translated/Transcribed Text Display */}
+      {/* Translated Text Display */}
       <Card className="p-4">
         <h3 className="text-sm font-medium mb-2">
           {showOriginal ? 'Translated Text' : 'Transcribed Text'}
         </h3>
         <div className="space-y-2">
           {transcriptions.map((item, index) => (
-            <div key={item.timestamp} className="text-gray-600">
-              {index === transcriptions.length - 1 ? (
-                <TypewriterText 
-                  text={item.text}
-                  onComplete={() => console.log('Translation complete')}
-                />
-              ) : (
-                <p>{item.text}</p>
-              )}
-            </div>
+            <p key={item.timestamp} className="text-gray-600">
+              {item.text}
+            </p>
           ))}
         </div>
         {isProcessing && (
