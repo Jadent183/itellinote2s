@@ -3,17 +3,63 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Languages, ArrowRight, BookOpen } from 'lucide-react';
+import { Mic, MicOff, Languages, ArrowRight, BookOpen, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import DataStructureVisualizer from './DataStructureVisualizer';
 import LanguageSelector from './LanguageSelector';
-import NotesDisplay from './NotesDisplay';
-import LectureNotesVisualizer from './LectureNotesVisualizer';
 import DynamicLectureNotes from './DynamicLectureNotes';
 
 const CHUNK_INTERVAL = 5000;
 
+// Typewriter Hook
+const useTypewriter = (text, speed = 50, delay = 0) => {
+  const [displayText, setDisplayText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+
+  useEffect(() => {
+    let timeoutId;
+    
+    if (text) {
+      setIsTyping(true);
+      let currentIndex = 0;
+      setDisplayText('');
+
+      timeoutId = setTimeout(() => {
+        const intervalId = setInterval(() => {
+          if (currentIndex < text.length) {
+            setDisplayText(prev => prev + text[currentIndex]);
+            currentIndex++;
+          } else {
+            clearInterval(intervalId);
+            setIsTyping(false);
+          }
+        }, speed);
+
+        return () => clearInterval(intervalId);
+      }, delay);
+    }
+
+    return () => clearTimeout(timeoutId);
+  }, [text, speed, delay]);
+
+  return { displayText, isTyping };
+};
+
+// Typewriter Component
+const TypewriterText = ({ text, speed = 50, delay = 0 }) => {
+    const { displayText, isTyping } = useTypewriter(text || '', speed, delay);
+    
+    return (
+      <div className="relative">
+        <p>{displayText}</p>
+        {isTyping && (
+          <span className="inline-block ml-1 animate-blink">|</span>
+        )}
+      </div>
+    );
+  };
+
 const SpeechTranscription = () => {
+  // Original state
   const [isRecording, setIsRecording] = useState(false);
   const [transcriptions, setTranscriptions] = useState([]);
   const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
@@ -23,7 +69,19 @@ const SpeechTranscription = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputLanguage, setInputLanguage] = useState('en-US');
   const [outputLanguage, setOutputLanguage] = useState('en-US');
+  const [isProcessingNotes, setIsProcessingNotes] = useState(false);
+  const [notesData, setNotesData] = useState(null);
   
+  // GPT-related state
+  const [gptResponse, setGptResponse] = useState('');
+  const [isProcessingGPT, setIsProcessingGPT] = useState(false);
+  const [threadId, setThreadId] = useState(null);
+  const [lastGPTCallTime, setLastGPTCallTime] = useState(null);
+  
+  // Constants
+  const GPT_CALL_DELAY = 10000; // 10 seconds delay
+
+  // Refs
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
@@ -31,6 +89,102 @@ const SpeechTranscription = () => {
   const isProcessingRef = useRef(false);
 
 
+  const handleInputLanguageChange = (langCode) => {
+    setInputLanguage(langCode);
+    if (isRecording) {
+      stopRecording();
+    }
+    setTranscriptions([]);
+    setOriginalTranscriptions([]);
+    setGptResponse('');
+  };
+
+  const handleOutputLanguageChange = (langCode) => {
+    setOutputLanguage(langCode);
+    if (isRecording) {
+      stopRecording();
+    }
+    setTranscriptions([]);
+    setOriginalTranscriptions([]);
+    setGptResponse('');
+  };
+
+  
+  useEffect(() => {
+    console.log('Current transcriptions:', transcriptions);
+  }, [transcriptions]);
+
+
+  // Modified processWithGPT to process entire transcription history
+  const processWithGPT = async () => {
+    console.log('processWithGPT called');
+    const currentTime = Date.now();
+    
+    // Check if enough time has passed since last GPT call
+    const timeSinceLastCall = lastGPTCallTime ? currentTime - lastGPTCallTime : GPT_CALL_DELAY + 1;
+    console.log('Time since last GPT call:', timeSinceLastCall);
+    console.log('Current transcriptions state:', transcriptions); // Debug log
+
+    if (timeSinceLastCall < GPT_CALL_DELAY) {
+      console.log('Skipping GPT call - too soon');
+      return;
+    }
+
+    // Get the current transcriptions directly from state
+    const currentTranscriptions = transcriptions;
+    console.log('Processing transcriptions:', currentTranscriptions);
+
+    if (!currentTranscriptions || currentTranscriptions.length === 0) {
+      console.log('No transcriptions to process');
+      return;
+    }
+
+    setIsProcessingGPT(true);
+    try {
+      // Combine all transcriptions into a single string
+      const fullTranscription = currentTranscriptions
+        .map(t => t.text)
+        .join(' ');
+
+      console.log('Full transcription to process:', fullTranscription);
+
+      if (!fullTranscription.trim()) {
+        console.log('Empty transcription after trimming');
+        return;
+      }
+
+      const response = await fetch('/api/gpt', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          transcription: fullTranscription,
+          threadId: threadId
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to process with GPT');
+      }
+
+      const data = await response.json();
+      console.log('GPT Response:', data);
+
+      if (data.response) {
+        setGptResponse(data.response);
+        setThreadId(data.threadId);
+      }
+
+      setLastGPTCallTime(currentTime);
+
+    } catch (err) {
+      console.error('GPT processing error:', err);
+      setError('Failed to process with GPT: ' + err.message);
+    } finally {
+      setIsProcessingGPT(false);
+    }
+  };
 
   const processAudioChunk = async (audioBlob) => {
     if (isProcessingRef.current) return;
@@ -59,13 +213,22 @@ const SpeechTranscription = () => {
       }
 
       const data = await response.json();
-      console.log('Response received:', data);
       
       if (data.transcription && data.transcription.trim()) {
-        setTranscriptions(prev => [...prev, {
-          text: data.transcription.trim(),
-          timestamp: new Date().toISOString(),
-        }]);
+        // Update transcriptions first
+        setTranscriptions(prev => {
+          const newTranscriptions = [...prev, {
+            text: data.transcription.trim(),
+            timestamp: new Date().toISOString(),
+          }];
+          
+          // Call processWithGPT with the updated transcriptions
+          setTimeout(() => {
+            processWithGPT();
+          }, 100); // Small delay to ensure state has updated
+          
+          return newTranscriptions;
+        });
         
         if (data.originalText) {
           setOriginalTranscriptions(prev => [...prev, {
@@ -83,23 +246,23 @@ const SpeechTranscription = () => {
     }
   };
 
-
-
   const collectAndProcessChunk = () => {
     if (chunksRef.current.length === 0) return;
     
     const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
-    chunksRef.current = []; // Clear the chunks array
+    chunksRef.current = [];
     processAudioChunk(audioBlob);
   };
-
-
 
   const startRecording = async () => {
     try {
       setError('');
       chunksRef.current = [];
       setTranscriptions([]);
+      setGptResponse('');
+      setNotesData(null);
+      setIsProcessingNotes(false);
+      setLastGPTCallTime(null);
       
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -121,9 +284,6 @@ const SpeechTranscription = () => {
       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
         throw new Error(`${options.mimeType} is not supported in this browser`);
       }
-
-      const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
 
       const startNewRecording = () => {
         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -149,7 +309,6 @@ const SpeechTranscription = () => {
 
       startNewRecording();
       setIsRecording(true);
-      console.log('Recording started');
     } catch (err) {
       console.error('Microphone error:', err);
       setError('Error accessing microphone: ' + err.message);
@@ -159,6 +318,8 @@ const SpeechTranscription = () => {
 
 
   const stopRecording = useCallback(() => {
+    console.log('Stopping recording...');
+    
     if (chunkIntervalRef.current) {
       clearInterval(chunkIntervalRef.current);
       chunkIntervalRef.current = null;
@@ -172,20 +333,16 @@ const SpeechTranscription = () => {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
+
+    // Force immediate GPT processing when recording stops
+    console.log('Forcing final GPT processing...');
+    setLastGPTCallTime(null); // Reset the timer to ensure processing
+    setTimeout(() => {
+      processWithGPT();
+    }, 100); // Small delay to ensure state has updated
     
     setIsRecording(false);
-  }, []);
-
-
-
-  const handleLanguageChange = (langCode) => {
-    setSelectedLanguage(langCode);
-    if (isRecording) {
-      stopRecording();
-    }
-    setTranscriptions([]);
-  };
-
+  }, [transcriptions]); // Add transcriptions to dependency array
 
 
   useEffect(() => {
@@ -204,122 +361,9 @@ const SpeechTranscription = () => {
 
 
 
-const handleInputLanguageChange = (langCode) => {
-    setInputLanguage(langCode);
-    if (isRecording) {
-      stopRecording();
-    }
-    setTranscriptions([]);
-    setOriginalTranscriptions([]);
-  };
 
 
-
-  const handleOutputLanguageChange = (langCode) => {
-    setOutputLanguage(langCode);
-    if (isRecording) {
-      stopRecording();
-    }
-    setTranscriptions([]);
-    setOriginalTranscriptions([]);
-  };
-
-
-//   const generateNotes = async () => {
-//     try {
-//       setIsGeneratingNotes(true);
-      
-//       // Get the complete transcription text
-//       const transcriptionText = transcriptions
-//         .map(t => t.text)
-//         .join(' ');
-
-//       const response = await fetch('/api/generate-notes', {
-//         method: 'POST',
-//         headers: {
-//           'Content-Type': 'application/json',
-//         },
-//         body: JSON.stringify({
-//           transcription: transcriptionText,
-//           language: outputLanguage,
-//         }),
-//       });
-
-//       if (!response.ok) {
-//         throw new Error('Failed to generate notes');
-//       }
-
-//       const data = await response.json();
-//       setNotes(data.notes);
-//     } catch (err) {
-//       console.error('Notes generation error:', err);
-//       setError('Failed to generate notes: ' + err.message);
-//     } finally {
-//       setIsGeneratingNotes(false);
-//     }
-//   };
-
-
-const lectureData = {
-    // "content": [
-    //   "Introduction:",
-    //   "The lecture covers two essential search algorithms: Linear Search and Binary Search.",
-    //   "Linear Search:",
-    //   "Description:",
-    //   "Checks each element in sequence until target is found or end is reached.",
-    //   "Advantages:",
-    //   "Best suited for unsorted data as no ordering is required.",
-    //   "Example:",
-    //   "Searching for 19 in [12, 4, 8, 19, 7, 5].",
-    //   "Steps: Comparisons made with 12, 4, 8, then 19 (found at index 3, after 4 comparisons).",
-    //   "Performance:",
-    //   "Time complexity: O(n) in the worst case.",
-    //   "Binary Search:",
-    //   "Description:",
-    //   "Requires a sorted array and utilizes a divide-and-conquer approach.",
-    //   "Example:",
-    //   "Searching for 14 in [2, 5, 7, 10, 14, 18, 21, 25].",
-    //   "Steps: Identify the middle element (10, index 3), compare and halve the search space. Narrow to [14, 18, 21, 25], then [14] (found at index 4, after 3 comparisons).",
-    //   "Performance:",
-    //   "Time complexity: O(log n), more efficient for large, sorted datasets.",
-    //   "Comparison and Use Cases:",
-    //   "Recommendations:",
-    //   "Use Linear Search for unsorted data or data structures like linked lists.",
-    //   "Use Binary Search for fast searching in sorted arrays or lists.",
-    //   "Next Steps:",
-    //   "Practice implementing these algorithms in code.",
-    //   "Discuss scenarios favoring each approach."
-    // ],
-    // "data-structures": [
-    //   {
-    //     "type": "array",
-    //     "initialValues": [
-    //       12,
-    //       4,
-    //       8,
-    //       19,
-    //       7,
-    //       5
-    //     ]
-    //   },
-    //   {
-    //     "type": "bst",
-    //     "initialValues": [
-    //       2,
-    //       5,
-    //       7,
-    //       10,
-    //       14,
-    //       18,
-    //       21,
-    //       25
-    //     ]
-    //   }
-    // ],
-    // "subject": "Linear Search vs. Binary Search"
-  };
-
-
+  
   return (
     <div className="max-w-4xl mx-auto p-4">
       <Card>
@@ -384,10 +428,18 @@ const lectureData = {
                   )}
                   <div className="whitespace-pre-wrap space-y-2">
                     {originalTranscriptions.length > 0 ? (
-                      originalTranscriptions.map((transcript) => (
-                        <p key={transcript.timestamp}>
-                          {transcript.text}
-                        </p>
+                      originalTranscriptions.map((transcript, index) => (
+                        <div key={transcript.timestamp}>
+                          {index === activeOriginalIndex ? (
+                            <TypewriterText 
+                              text={transcript.text} 
+                              speed={30} 
+                              delay={0}
+                            />
+                          ) : (
+                            <p>{transcript.text}</p>
+                          )}
+                        </div>
                       ))
                     ) : (
                       'Original transcription will appear here...'
@@ -409,32 +461,80 @@ const lectureData = {
                   </div>
                 )}
                 <div className="whitespace-pre-wrap space-y-2">
-                  {transcriptions.length > 0 ? (
+                {transcriptions.length > 0 ? (
                     transcriptions.map((transcript) => (
-                      <p key={transcript.timestamp}>
+                    <p key={transcript.timestamp}>
                         {transcript.text}
-                      </p>
+                    </p>
                     ))
-                  ) : (
+                ) : (
                     'Transcription will appear here...'
-                  )}
+                )}
                 </div>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
-                  {/* Spacer */}
-      <div className="max-w-4xl mx-auto p-4" />
 
-                  {/* Notes Data */}
-      <Card>
+
+      {/* GPT Response Card */}
+      <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>AI Assistant Response</span>
+            <BookOpen className="h-6 w-6 text-gray-500" />
+          </CardTitle>
+        </CardHeader>
         <CardContent>
-            <DynamicLectureNotes lectureData={lectureData}/>
+          {isProcessingGPT ? (
+            <div className="flex items-center gap-2 text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Processing with AI Assistant...</span>
+            </div>
+          ) : gptResponse ? (
+            <div className="whitespace-pre-wrap">
+            {gptResponse}
+          </div>
+        ) : (
+          <div className="text-gray-500">
+            AI Assistant response will appear here...
+          </div>
+        )}
+        </CardContent>
+        </Card>
+
+
+     {/* Notes Card */}
+     <Card className="mt-4">
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Lecture Notes</span>
+            <BookOpen className="h-6 w-6 text-gray-500" />
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isProcessingNotes ? (
+            <div className="flex items-center justify-center gap-2 text-gray-500 p-4">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Generating structured notes...</span>
+            </div>
+          ) : notesData ? (
+            <DynamicLectureNotes lectureData={notesData} />
+          ) : isRecording ? (
+            <div className="text-gray-500 text-center p-4">
+              Notes will be generated when recording stops...
+            </div>
+          ) : (
+            <div className="text-gray-500 text-center p-4">
+              Start recording to generate notes
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
   );
 };
+
 
 export default SpeechTranscription;
