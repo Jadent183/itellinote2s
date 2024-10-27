@@ -1,4 +1,6 @@
 import React from 'react';
+import { Card } from '@/components/ui/card';
+import TypewriterText from './TypewriterText';
 
 const TranscriptionDisplay = ({
   inputLanguage,
@@ -7,52 +9,63 @@ const TranscriptionDisplay = ({
   originalTranscriptions,
   transcriptions,
 }) => {
+  const showOriginal = inputLanguage !== outputLanguage;
+
+  // Get the latest transcription text
+  const getLatestTranscription = (items) => {
+    const latest = items[items.length - 1];
+    return latest ? latest.text : '';
+  };
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {inputLanguage !== outputLanguage && (
-        <div className="p-4 bg-gray-50 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">
-            Original ({inputLanguage}):
-          </h3>
-          {isProcessing && (
-            <div className="flex items-center gap-2 text-gray-500 italic mb-2">
-              <span className="animate-pulse">Processing audio...</span>
-            </div>
-          )}
-          <div className="whitespace-pre-wrap space-y-2">
-            {originalTranscriptions.length > 0 ? (
-              originalTranscriptions.map((transcript) => (
-                <p key={transcript.timestamp}>{transcript.text}</p>
-              ))
-            ) : (
-              'Original transcription will appear here...'
-            )}
+    <div className="grid gap-4">
+      {/* Original Text Display */}
+      {showOriginal && (
+        <Card className="p-4">
+          <h3 className="text-sm font-medium mb-2">Original Text</h3>
+          <div className="space-y-2">
+            {originalTranscriptions.map((item, index) => (
+              <div key={item.timestamp} className="text-gray-600">
+                {index === originalTranscriptions.length - 1 ? (
+                  <TypewriterText 
+                    text={item.text}
+                    onComplete={() => console.log('Original text complete')}
+                  />
+                ) : (
+                  <p>{item.text}</p>
+                )}
+              </div>
+            ))}
           </div>
-        </div>
+          {isProcessing && (
+            <p className="text-sm text-gray-400 mt-2">Processing...</p>
+          )}
+        </Card>
       )}
 
-      <div className="p-4 bg-gray-50 rounded-lg">
-        <h3 className="text-lg font-semibold mb-2">
-          {inputLanguage === outputLanguage ? 
-            'Transcription:' : 
-            `Translation (${outputLanguage}):`
-          }
+      {/* Translated/Transcribed Text Display */}
+      <Card className="p-4">
+        <h3 className="text-sm font-medium mb-2">
+          {showOriginal ? 'Translated Text' : 'Transcribed Text'}
         </h3>
-        {isProcessing && (
-          <div className="flex items-center gap-2 text-gray-500 italic mb-2">
-            <span className="animate-pulse">Processing audio...</span>
-          </div>
-        )}
-        <div className="whitespace-pre-wrap space-y-2">
-          {transcriptions.length > 0 ? (
-            transcriptions.map((transcript) => (
-              <p key={transcript.timestamp}>{transcript.text}</p>
-            ))
-          ) : (
-            'Transcription will appear here...'
-          )}
+        <div className="space-y-2">
+          {transcriptions.map((item, index) => (
+            <div key={item.timestamp} className="text-gray-600">
+              {index === transcriptions.length - 1 ? (
+                <TypewriterText 
+                  text={item.text}
+                  onComplete={() => console.log('Translation complete')}
+                />
+              ) : (
+                <p>{item.text}</p>
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+        {isProcessing && (
+          <p className="text-sm text-gray-400 mt-2">Processing...</p>
+        )}
+      </Card>
     </div>
   );
 };

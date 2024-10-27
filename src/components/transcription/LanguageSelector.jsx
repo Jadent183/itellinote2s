@@ -22,9 +22,18 @@ const LANGUAGES = {
   'Chinese': 'zh',
 };
 
-const LanguageSelector = ({ onLanguageChange }) => {
+const LanguageSelector = ({ onLanguageChange, defaultValue, currentValue }) => {
+  const handleValueChange = (value) => {
+    console.log('Language selected:', value); // Debug log
+    onLanguageChange(value);
+  };
+
   return (
-    <Select onValueChange={onLanguageChange} defaultValue="en-US">
+    <Select
+      onValueChange={handleValueChange}
+      value={currentValue || defaultValue}
+      defaultValue={defaultValue}
+    >
       <SelectTrigger className="w-[180px]">
         <SelectValue placeholder="Select Language" />
       </SelectTrigger>

@@ -1,12 +1,11 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Languages } from 'lucide-react';
-import LanguageSelector from './LanguageSelector';
-import { ArrowRight } from 'lucide-react';
+import { Languages, ArrowRight, Mic, MicOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import LanguageSelector from './LanguageSelector';
 import TranscriptionDisplay from './TranscriptionDisplay';
+import AudioVisualizer from './AudioVisualizer';
 
 const TranscriptionCard = ({
   error,
@@ -37,31 +36,35 @@ const TranscriptionCard = ({
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        
+
         <div className="space-y-4">
           <div className="flex items-center justify-center gap-4">
             <div>
               <p className="text-sm text-gray-500 mb-1">Input Language</p>
-              <LanguageSelector 
-                onLanguageChange={handleInputLanguageChange} 
-                defaultValue={inputLanguage} 
+              <LanguageSelector
+                onLanguageChange={handleInputLanguageChange}
+                defaultValue="en-US"
+                currentValue={inputLanguage}
               />
             </div>
             <ArrowRight className="h-4 w-4 mt-6 text-gray-400" />
             <div>
               <p className="text-sm text-gray-500 mb-1">Output Language</p>
-              <LanguageSelector 
-                onLanguageChange={handleOutputLanguageChange} 
-                defaultValue={outputLanguage} 
+              <LanguageSelector
+                onLanguageChange={handleOutputLanguageChange}
+                defaultValue="en-US"
+                currentValue={outputLanguage}
               />
             </div>
           </div>
 
+
           <div className="flex justify-center mt-4">
-            <Button 
+            <Button
               onClick={isRecording ? stopRecording : startRecording}
               variant={isRecording ? "destructive" : "default"}
               className="flex items-center gap-2"
+              disabled={isProcessing}
             >
               {isRecording ? (
                 <>

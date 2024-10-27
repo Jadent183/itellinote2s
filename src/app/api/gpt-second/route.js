@@ -1,68 +1,62 @@
 import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const ASSISTANT_ID = process.env.FINAL_GPT_ASSISTANT_ID;
 
 export async function POST(request) {
   try {
+    if (!ASSISTANT_ID) {
+      throw new Error('Assistant ID not configured');
+    }
+
     const { input } = await request.json();
 
-    // Simply structure the lecture data without formatting the content
-    const lectureData = {
-      "content": [
-        "Linear Search:",
-        "Straightforward approach: Check each element sequentially until target is found or array ends.",
-        "Example: For array [12, 4, 8, 19, 7, 5], searching for 19 takes four comparisons.",
-        "Time complexity: O(n), as in the worst-case scenario, every element needs to be checked.",
-        "Best suited for unsorted data since no order is required.",
-        "Binary Search:",
-        "Requires sorted data, using a divide-and-conquer method.",
-        "Example: For sorted array [2, 5, 7, 10, 14, 18, 21, 25], finding 14 takes three comparisons.",
-        "Involves halving the search space with each step.",
-        "Time complexity: O(log n), making it efficient for large datasets.",
-        "Ideal for contexts where quick access to sorted data is possible.",
-        "Comparison and Use Cases:",
-        "Linear Search: For unsorted data or structures without fast index-based access (e.g., linked lists).",
-        "Binary Search: For sorted arrays/lists, providing fast search capabilities.",
-        "Upcoming class topics: Implementation of these algorithms and deeper analysis of use-case scenarios.",
-        "Questions and Clarifications:",
-        "Open to questions about differences and applications of Linear and Binary Search before concluding the session."
-      ],
-      "data-structures": [
-        {
-          "type": "array",
-          "initialValues": [
-            12,
-            4,
-            8,
-            19,
-            7,
-            5
-          ]
-        },
-        {
-          "type": "bst",
-          "initialValues": [
-            2,
-            5,
-            7,
-            10,
-            14,
-            18,
-            21,
-            25
-          ]
-        }
-      ],
-      "subject": "Linear Search and Binary Search"
-    };
-
-    return NextResponse.json({
-      response: lectureData,
-      threadId: Math.random().toString(36).substring(7)
+    const thread = await openai.beta.threads.create();
+    
+    await openai.beta.threads.messages.create(thread.id, {
+      role: "user",
+      content: input
     });
+
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: ASSISTANT_ID,
+    });
+
+    let runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+    while (runStatus.status !== 'completed') {
+      if (runStatus.status === 'failed' || runStatus.status === 'expired') {
+        throw new Error(`Assistant run ${runStatus.status}`);
+      }
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      runStatus = await openai.beta.threads.runs.retrieve(thread.id, run.id);
+    }
+
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const lastMessage = messages.data[0];
+
+    // Get the raw response content
+    const responseText = lastMessage.content[0].text.value;
+    
+    // Pass through the response directly
+    return NextResponse.json({
+      response: JSON.parse(responseText),
+      threadId: thread.id
+    });
+
   } catch (error) {
     console.error('Error in GPT-second route:', error);
-    return NextResponse.json(
-      { error: 'Failed to process notes' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      error: {
+        message: 'Failed to process with second assistant',
+        details: error.message,
+        type: error.type || 'unknown'
+      }
+    }, { 
+      status: error.status || 500 
+    });
   }
 }

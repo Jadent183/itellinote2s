@@ -38,6 +38,7 @@ const LANGUAGE_MAPPING = {
 
 export async function POST(req) {
   if (!speechClient || !translationClient) {
+    console.error('Clients not initialized');
     return new Response(
       JSON.stringify({ error: 'API clients not properly initialized' }),
       { status: 500 }
@@ -47,8 +48,14 @@ export async function POST(req) {
   try {
     const data = await req.formData();
     const audio = data.get('audio');
-    const inputLanguage = data.get('inputLanguage') || 'en-US';
-    const outputLanguage = data.get('outputLanguage') || 'en-US';
+    const inputLanguage = data.get('inputLanguage');
+    const outputLanguage = data.get('outputLanguage');
+
+    console.log('Received request with languages:', { 
+      inputLanguage, 
+      outputLanguage,
+      hasAudio: !!audio 
+    });
 
     if (!audio) {
       return new Response(
@@ -57,17 +64,16 @@ export async function POST(req) {
       );
     }
 
-    const buffer = Buffer.from(await audio.arrayBuffer());
-
-    const maxSize = 1024 * 1024;
-    if (buffer.length > maxSize) {
+    if (!inputLanguage || !outputLanguage) {
       return new Response(
-        JSON.stringify({ error: 'Audio chunk too large' }),
+        JSON.stringify({ error: 'Language settings not provided' }),
         { status: 400 }
       );
     }
 
-    // Transcribe the audio in the input language
+    const buffer = Buffer.from(await audio.arrayBuffer());
+
+    // Always transcribe in input language
     const transcribeRequest = {
       audio: {
         content: buffer.toString('base64'),
@@ -79,86 +85,84 @@ export async function POST(req) {
         model: 'default',
         enableAutomaticPunctuation: true,
         useEnhanced: true,
-        maxAlternatives: 1,
-        profanityFilter: false,
-        enableWordTimeOffsets: false,
-        metadata: {
-          interactionType: 'DICTATION',
-          microphoneDistance: 'NEARFIELD',
-          originalMediaType: 'AUDIO',
-        },
       },
     };
 
+    console.log('Sending transcription request in language:', inputLanguage);
     const [transcribeResponse] = await speechClient.recognize(transcribeRequest);
-    let originalTranscription = '';
     
-    if (transcribeResponse.results && transcribeResponse.results.length > 0) {
-      originalTranscription = transcribeResponse.results
-        .map(result => result.alternatives[0].transcript)
-        .join(' ');
-    }
-
-    // If input and output languages are the same or transcription is empty, return the transcription
-    if (inputLanguage === outputLanguage || !originalTranscription) {
+    if (!transcribeResponse.results || transcribeResponse.results.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          transcription: originalTranscription,
-          inputLanguage,
-          outputLanguage
-        }),
-        {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json',
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-          },
-        }
+        JSON.stringify({ error: 'No transcription results' }),
+        { status: 404 }
       );
     }
 
-    // Translate the transcription to the target language
+    const originalText = transcribeResponse.results
+      .map(result => result.alternatives[0].transcript)
+      .join(' ');
+
+    console.log('Original transcription:', originalText);
+
+    // If languages are the same, return without translation
+    if (inputLanguage === outputLanguage) {
+      return new Response(
+        JSON.stringify({ 
+          transcription: originalText,
+          originalText: originalText,
+          inputLanguage,
+          outputLanguage
+        }),
+        { status: 200 }
+      );
+    }
+
+    // Translate if languages are different
     const translateRequest = {
       parent: `projects/${process.env.GOOGLE_PROJECT_ID}/locations/global`,
-      contents: [originalTranscription],
+      contents: [originalText],
       mimeType: 'text/plain',
-      sourceLanguageCode: LANGUAGE_MAPPING[inputLanguage] || 'en',
-      targetLanguageCode: LANGUAGE_MAPPING[outputLanguage] || 'en',
+      sourceLanguageCode: LANGUAGE_MAPPING[inputLanguage],
+      targetLanguageCode: LANGUAGE_MAPPING[outputLanguage],
     };
 
+    console.log('Sending translation request:', {
+      source: LANGUAGE_MAPPING[inputLanguage],
+      target: LANGUAGE_MAPPING[outputLanguage],
+      text: originalText
+    });
+
     const [translateResponse] = await translationClient.translateText(translateRequest);
+    
+    if (!translateResponse.translations || translateResponse.translations.length === 0) {
+      throw new Error('No translation result');
+    }
+
     const translatedText = translateResponse.translations[0].translatedText;
+
+    console.log('Translation result:', {
+      original: originalText,
+      translated: translatedText,
+    });
 
     return new Response(
       JSON.stringify({ 
         transcription: translatedText,
-        originalText: originalTranscription,
+        originalText: originalText,
         inputLanguage,
         outputLanguage
       }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-        },
-      }
+      { status: 200 }
     );
 
   } catch (error) {
-    console.error('Detailed error:', error);
+    console.error('Error in transcribe API:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
-        details: error.details || 'Unknown error occurred',
-        errorStack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.stack
       }),
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      }
+      { status: 500 }
     );
   }
 }

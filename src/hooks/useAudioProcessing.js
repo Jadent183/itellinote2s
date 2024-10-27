@@ -1,6 +1,4 @@
-// src/hooks/useAudioProcessing.js
-
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 const CHUNK_INTERVAL = 5000;
 
@@ -9,17 +7,23 @@ export const useAudioProcessing = ({
   inputLanguage, 
   outputLanguage 
 }) => {
-  // State
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
-  // Refs
   const mediaRecorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const chunkIntervalRef = useRef(null);
   const isProcessingRef = useRef(false);
+
+  // Debug effect for language changes
+  useEffect(() => {
+    console.log('Audio processing hook languages updated:', { 
+      inputLanguage, 
+      outputLanguage 
+    });
+  }, [inputLanguage, outputLanguage]);
 
   const processAudioChunk = async (audioBlob) => {
     if (isProcessingRef.current || audioBlob.size < 1000) {
@@ -35,18 +39,33 @@ export const useAudioProcessing = ({
       formData.append('inputLanguage', inputLanguage);
       formData.append('outputLanguage', outputLanguage);
 
+      console.log('Processing audio chunk with languages:', { 
+        inputLanguage, 
+        outputLanguage,
+        blobSize: audioBlob.size 
+      });
+
       const response = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       });
 
       if (!response.ok) {
-        throw new Error('Failed to process audio');
+        const errorData = await response.json();
+        console.error('Transcription API error:', errorData);
+        throw new Error(errorData.error || 'Failed to process audio');
       }
 
       const data = await response.json();
-      if (data.transcription?.trim()) {
-        onTranscriptionUpdate(data);
+      console.log('Received transcription response:', data);
+
+      if (data.transcription || data.originalText) {
+        onTranscriptionUpdate({
+          transcription: data.transcription?.trim(),
+          originalText: data.originalText?.trim(),
+          inputLanguage: data.inputLanguage,
+          outputLanguage: data.outputLanguage
+        });
       }
     } catch (err) {
       console.error('Processing error:', err);
@@ -65,7 +84,7 @@ export const useAudioProcessing = ({
     });
     chunksRef.current = [];
     processAudioChunk(audioBlob);
-  }, []);
+  }, [inputLanguage, outputLanguage]); // Add dependencies
 
   const stopRecording = useCallback(() => {
     if (chunkIntervalRef.current) {
@@ -138,7 +157,6 @@ export const useAudioProcessing = ({
     }
   };
 
-  // Cleanup function
   const cleanup = useCallback(() => {
     if (chunkIntervalRef.current) {
       clearInterval(chunkIntervalRef.current);
@@ -151,13 +169,12 @@ export const useAudioProcessing = ({
     }
   }, []);
 
-  // Return the hook interface
   return {
     isRecording,
     isProcessing,
     error,
     startRecording,
     stopRecording,
-    cleanup
+    cleanup,
   };
 };

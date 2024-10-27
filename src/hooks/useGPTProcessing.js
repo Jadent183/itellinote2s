@@ -15,7 +15,7 @@ export const useGPTProcessing = () => {
 
     setIsProcessingNotes(true);
     try {
-      console.log('Processing notes with input:', firstGptResponse); // Debug log
+      console.log('Processing notes with input:', firstGptResponse);
 
       const response = await fetch('/api/gpt-second', {
         method: 'POST',
@@ -35,7 +35,7 @@ export const useGPTProcessing = () => {
       const data = await response.json();
       
       if (data.response) {
-        console.log('Received notes data:', data.response); // Debug log
+        console.log('Received notes data:', data.response);
         setNotesData(data.response);
       }
     } catch (error) {
@@ -54,7 +54,7 @@ export const useGPTProcessing = () => {
     }
   }, []);
 
-  const processWithGPT = useCallback(async (transcriptionText, currentThreadId = null) => {
+  const processWithGPT = useCallback(async (transcriptionText, translatedText = null, currentThreadId = null) => {
     const currentTime = Date.now();
     const timeSinceLastCall = lastGPTCallTime ? currentTime - lastGPTCallTime : GPT_CALL_DELAY + 1;
 
@@ -64,13 +64,17 @@ export const useGPTProcessing = () => {
 
     setIsProcessingGPT(true);
     try {
+      // Use translated text if available, otherwise use original transcription
+      const textToProcess = translatedText || transcriptionText;
+      console.log('Processing with GPT:', { textToProcess });
+
       const response = await fetch('/api/gpt', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          transcription: transcriptionText,
+          transcription: textToProcess,
           threadId: currentThreadId || threadId
         }),
       });

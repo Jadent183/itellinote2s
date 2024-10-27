@@ -1,6 +1,7 @@
 // src/components/notes/DynamicLectureNotes.jsx
 import React from 'react';
 import DataStructureVisualizer from '@/components/notes/DataStructureVisualizer';
+import QuizSection from '@/components/quiz/QuizSection';
 
 // Helper function to identify headers
 const isHeader = (line) => {
@@ -63,27 +64,37 @@ const formatContent = (content = []) => {
 };
 
 // Helper function to normalize data structure format
-const normalizeDataStructures = (dataStructures) => {
+const normalizeDataStructures = (dataStructures, initialValues = []) => {
+  console.log('Normalizing:', { dataStructures, initialValues }); // Debug log
+
   if (!dataStructures) return [];
   if (dataStructures === 'none') return [];
-  if (typeof dataStructures === 'string') {
+
+  // Handle case where data-structures is a string and initial-values is an array
+  if (typeof dataStructures === 'string' && Array.isArray(initialValues)) {
     return [{
       type: dataStructures,
-      initialValues: []
+      initialValues: initialValues
     }];
   }
+    // Handle array of data structures
   if (Array.isArray(dataStructures)) {
     return dataStructures.map(ds => {
       if (typeof ds === 'string') {
         return {
           type: ds,
-          initialValues: []
+          initialValues: initialValues
         };
       }
       return ds;
     });
   }
-  return [dataStructures];
+  // Handle single data structure object
+  if (typeof dataStructures === 'object' && dataStructures !== null) {
+    return [dataStructures];
+  }
+
+  return [];
 };
 
 // Helper function to format values for visualization
@@ -99,15 +110,15 @@ const DynamicLectureNotes = ({ lectureData }) => {
   const { 
     content, 
     "data-structures": rawDataStructures,
-    "initial-values": defaultInitialValues = [] 
+    "initial-values": rawInitialValues 
   } = lectureData;
 
-  console.log('Lecture Data:', lectureData); 
+  console.log('Raw lecture data:', lectureData); // Debug log
 
-  const dataStructures = normalizeDataStructures(rawDataStructures).map(ds => ({
-    ...ds,
-    initialValues: ds.initialValues || defaultInitialValues
-  }));
+  // Normalize data structures with initial values
+  const dataStructures = normalizeDataStructures(rawDataStructures, rawInitialValues);
+
+  console.log('Normalized data structures:', dataStructures); // Debug log
 
   console.log('Normalized Data Structures:', dataStructures); 
 
@@ -205,8 +216,16 @@ const DynamicLectureNotes = ({ lectureData }) => {
                 }
               })}
             </div>
+
+
+
+
           </section>
         ))}
+        {/* Quiz Section */}
+        {lectureData.quizzes && lectureData.quizzes.length > 0 && (
+          <QuizSection quizzes={lectureData.quizzes} />
+        )}
       </div>
     </div>
   );
