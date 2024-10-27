@@ -1,540 +1,540 @@
-"use client";
+// "use client";
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Languages, ArrowRight, BookOpen, Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import LanguageSelector from './LanguageSelector';
-import DynamicLectureNotes from './DynamicLectureNotes';
+// import React, { useState, useRef, useCallback, useEffect } from 'react';
+// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+// import { Button } from '@/components/ui/button';
+// import { Mic, MicOff, Languages, ArrowRight, BookOpen, Loader2 } from 'lucide-react';
+// import { Alert, AlertDescription } from '@/components/ui/alert';
+// import LanguageSelector from '../transcription/LanguageSelector';
+// import DynamicLectureNotes from './DynamicLectureNotes';
 
-const CHUNK_INTERVAL = 5000;
+// const CHUNK_INTERVAL = 5000;
 
-// Typewriter Hook
-const useTypewriter = (text, speed = 50, delay = 0) => {
-  const [displayText, setDisplayText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
+// // Typewriter Hook
+// const useTypewriter = (text, speed = 50, delay = 0) => {
+//   const [displayText, setDisplayText] = useState('');
+//   const [isTyping, setIsTyping] = useState(false);
 
-  useEffect(() => {
-    let timeoutId;
+//   useEffect(() => {
+//     let timeoutId;
     
-    if (text) {
-      setIsTyping(true);
-      let currentIndex = 0;
-      setDisplayText('');
+//     if (text) {
+//       setIsTyping(true);
+//       let currentIndex = 0;
+//       setDisplayText('');
 
-      timeoutId = setTimeout(() => {
-        const intervalId = setInterval(() => {
-          if (currentIndex < text.length) {
-            setDisplayText(prev => prev + text[currentIndex]);
-            currentIndex++;
-          } else {
-            clearInterval(intervalId);
-            setIsTyping(false);
-          }
-        }, speed);
+//       timeoutId = setTimeout(() => {
+//         const intervalId = setInterval(() => {
+//           if (currentIndex < text.length) {
+//             setDisplayText(prev => prev + text[currentIndex]);
+//             currentIndex++;
+//           } else {
+//             clearInterval(intervalId);
+//             setIsTyping(false);
+//           }
+//         }, speed);
 
-        return () => clearInterval(intervalId);
-      }, delay);
-    }
+//         return () => clearInterval(intervalId);
+//       }, delay);
+//     }
 
-    return () => clearTimeout(timeoutId);
-  }, [text, speed, delay]);
+//     return () => clearTimeout(timeoutId);
+//   }, [text, speed, delay]);
 
-  return { displayText, isTyping };
-};
+//   return { displayText, isTyping };
+// };
 
-// Typewriter Component
-const TypewriterText = ({ text, speed = 50, delay = 0 }) => {
-    const { displayText, isTyping } = useTypewriter(text || '', speed, delay);
+// // Typewriter Component
+// const TypewriterText = ({ text, speed = 50, delay = 0 }) => {
+//     const { displayText, isTyping } = useTypewriter(text || '', speed, delay);
     
-    return (
-      <div className="relative">
-        <p>{displayText}</p>
-        {isTyping && (
-          <span className="inline-block ml-1 animate-blink">|</span>
-        )}
-      </div>
-    );
-  };
+//     return (
+//       <div className="relative">
+//         <p>{displayText}</p>
+//         {isTyping && (
+//           <span className="inline-block ml-1 animate-blink">|</span>
+//         )}
+//       </div>
+//     );
+//   };
 
-const SpeechTranscription = () => {
-  // Original state
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcriptions, setTranscriptions] = useState([]);
-  const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
-  const [notes, setNotes] = useState('');
-  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
-  const [error, setError] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [inputLanguage, setInputLanguage] = useState('en-US');
-  const [outputLanguage, setOutputLanguage] = useState('en-US');
-  const [isProcessingNotes, setIsProcessingNotes] = useState(false);
-  const [notesData, setNotesData] = useState(null);
+// const SpeechTranscription = () => {
+//   // Original state
+//   const [isRecording, setIsRecording] = useState(false);
+//   const [transcriptions, setTranscriptions] = useState([]);
+//   const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
+//   const [notes, setNotes] = useState('');
+//   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
+//   const [error, setError] = useState('');
+//   const [isProcessing, setIsProcessing] = useState(false);
+//   const [inputLanguage, setInputLanguage] = useState('en-US');
+//   const [outputLanguage, setOutputLanguage] = useState('en-US');
+//   const [isProcessingNotes, setIsProcessingNotes] = useState(false);
+//   const [notesData, setNotesData] = useState(null);
   
-  // GPT-related state
-  const [gptResponse, setGptResponse] = useState('');
-  const [isProcessingGPT, setIsProcessingGPT] = useState(false);
-  const [threadId, setThreadId] = useState(null);
-  const [lastGPTCallTime, setLastGPTCallTime] = useState(null);
+//   // GPT-related state
+//   const [gptResponse, setGptResponse] = useState('');
+//   const [isProcessingGPT, setIsProcessingGPT] = useState(false);
+//   const [threadId, setThreadId] = useState(null);
+//   const [lastGPTCallTime, setLastGPTCallTime] = useState(null);
   
-  // Constants
-  const GPT_CALL_DELAY = 10000; // 10 seconds delay
+//   // Constants
+//   const GPT_CALL_DELAY = 10000; // 10 seconds delay
 
-  // Refs
-  const mediaRecorderRef = useRef(null);
-  const streamRef = useRef(null);
-  const chunksRef = useRef([]);
-  const chunkIntervalRef = useRef(null);
-  const isProcessingRef = useRef(false);
+//   // Refs
+//   const mediaRecorderRef = useRef(null);
+//   const streamRef = useRef(null);
+//   const chunksRef = useRef([]);
+//   const chunkIntervalRef = useRef(null);
+//   const isProcessingRef = useRef(false);
 
 
-  const handleInputLanguageChange = (langCode) => {
-    setInputLanguage(langCode);
-    if (isRecording) {
-      stopRecording();
-    }
-    setTranscriptions([]);
-    setOriginalTranscriptions([]);
-    setGptResponse('');
-  };
+//   const handleInputLanguageChange = (langCode) => {
+//     setInputLanguage(langCode);
+//     if (isRecording) {
+//       stopRecording();
+//     }
+//     setTranscriptions([]);
+//     setOriginalTranscriptions([]);
+//     setGptResponse('');
+//   };
 
-  const handleOutputLanguageChange = (langCode) => {
-    setOutputLanguage(langCode);
-    if (isRecording) {
-      stopRecording();
-    }
-    setTranscriptions([]);
-    setOriginalTranscriptions([]);
-    setGptResponse('');
-  };
+//   const handleOutputLanguageChange = (langCode) => {
+//     setOutputLanguage(langCode);
+//     if (isRecording) {
+//       stopRecording();
+//     }
+//     setTranscriptions([]);
+//     setOriginalTranscriptions([]);
+//     setGptResponse('');
+//   };
 
   
-  useEffect(() => {
-    console.log('Current transcriptions:', transcriptions);
-  }, [transcriptions]);
+//   useEffect(() => {
+//     console.log('Current transcriptions:', transcriptions);
+//   }, [transcriptions]);
 
 
-  // Modified processWithGPT to process entire transcription history
-  const processWithGPT = async () => {
-    console.log('processWithGPT called');
-    const currentTime = Date.now();
+//   // Modified processWithGPT to process entire transcription history
+//   const processWithGPT = async () => {
+//     console.log('processWithGPT called');
+//     const currentTime = Date.now();
     
-    // Check if enough time has passed since last GPT call
-    const timeSinceLastCall = lastGPTCallTime ? currentTime - lastGPTCallTime : GPT_CALL_DELAY + 1;
-    console.log('Time since last GPT call:', timeSinceLastCall);
-    console.log('Current transcriptions state:', transcriptions); // Debug log
+//     // Check if enough time has passed since last GPT call
+//     const timeSinceLastCall = lastGPTCallTime ? currentTime - lastGPTCallTime : GPT_CALL_DELAY + 1;
+//     console.log('Time since last GPT call:', timeSinceLastCall);
+//     console.log('Current transcriptions state:', transcriptions); // Debug log
 
-    if (timeSinceLastCall < GPT_CALL_DELAY) {
-      console.log('Skipping GPT call - too soon');
-      return;
-    }
+//     if (timeSinceLastCall < GPT_CALL_DELAY) {
+//       console.log('Skipping GPT call - too soon');
+//       return;
+//     }
 
-    // Get the current transcriptions directly from state
-    const currentTranscriptions = transcriptions;
-    console.log('Processing transcriptions:', currentTranscriptions);
+//     // Get the current transcriptions directly from state
+//     const currentTranscriptions = transcriptions;
+//     console.log('Processing transcriptions:', currentTranscriptions);
 
-    if (!currentTranscriptions || currentTranscriptions.length === 0) {
-      console.log('No transcriptions to process');
-      return;
-    }
+//     if (!currentTranscriptions || currentTranscriptions.length === 0) {
+//       console.log('No transcriptions to process');
+//       return;
+//     }
 
-    setIsProcessingGPT(true);
-    try {
-      // Combine all transcriptions into a single string
-      const fullTranscription = currentTranscriptions
-        .map(t => t.text)
-        .join(' ');
+//     setIsProcessingGPT(true);
+//     try {
+//       // Combine all transcriptions into a single string
+//       const fullTranscription = currentTranscriptions
+//         .map(t => t.text)
+//         .join(' ');
 
-      console.log('Full transcription to process:', fullTranscription);
+//       console.log('Full transcription to process:', fullTranscription);
 
-      if (!fullTranscription.trim()) {
-        console.log('Empty transcription after trimming');
-        return;
-      }
+//       if (!fullTranscription.trim()) {
+//         console.log('Empty transcription after trimming');
+//         return;
+//       }
 
-      const response = await fetch('/api/gpt', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          transcription: fullTranscription,
-          threadId: threadId
-        }),
-      });
+//       const response = await fetch('/api/gpt', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           transcription: fullTranscription,
+//           threadId: threadId
+//         }),
+//       });
 
-      if (!response.ok) {
-        throw new Error('Failed to process with GPT');
-      }
+//       if (!response.ok) {
+//         throw new Error('Failed to process with GPT');
+//       }
 
-      const data = await response.json();
-      console.log('GPT Response:', data);
+//       const data = await response.json();
+//       console.log('GPT Response:', data);
 
-      if (data.response) {
-        setGptResponse(data.response);
-        setThreadId(data.threadId);
-      }
+//       if (data.response) {
+//         setGptResponse(data.response);
+//         setThreadId(data.threadId);
+//       }
 
-      setLastGPTCallTime(currentTime);
+//       setLastGPTCallTime(currentTime);
 
-    } catch (err) {
-      console.error('GPT processing error:', err);
-      setError('Failed to process with GPT: ' + err.message);
-    } finally {
-      setIsProcessingGPT(false);
-    }
-  };
+//     } catch (err) {
+//       console.error('GPT processing error:', err);
+//       setError('Failed to process with GPT: ' + err.message);
+//     } finally {
+//       setIsProcessingGPT(false);
+//     }
+//   };
 
-  const processAudioChunk = async (audioBlob) => {
-    if (isProcessingRef.current) return;
+//   const processAudioChunk = async (audioBlob) => {
+//     if (isProcessingRef.current) return;
     
-    try {
-      isProcessingRef.current = true;
-      setIsProcessing(true);
+//     try {
+//       isProcessingRef.current = true;
+//       setIsProcessing(true);
       
-      if (audioBlob.size < 1000) {
-        console.log('Skipping small audio chunk');
-        return;
-      }
+//       if (audioBlob.size < 1000) {
+//         console.log('Skipping small audio chunk');
+//         return;
+//       }
 
-      const formData = new FormData();
-      formData.append('audio', audioBlob);
-      formData.append('inputLanguage', inputLanguage);
-      formData.append('outputLanguage', outputLanguage);
+//       const formData = new FormData();
+//       formData.append('audio', audioBlob);
+//       formData.append('inputLanguage', inputLanguage);
+//       formData.append('outputLanguage', outputLanguage);
 
-      const response = await fetch('/api/transcribe', {
-        method: 'POST',
-        body: formData,
-      });
+//       const response = await fetch('/api/transcribe', {
+//         method: 'POST',
+//         body: formData,
+//       });
 
-      if (!response.ok) {
-        throw new Error('Failed to process audio');
-      }
+//       if (!response.ok) {
+//         throw new Error('Failed to process audio');
+//       }
 
-      const data = await response.json();
+//       const data = await response.json();
       
-      if (data.transcription && data.transcription.trim()) {
-        // Update transcriptions first
-        setTranscriptions(prev => {
-          const newTranscriptions = [...prev, {
-            text: data.transcription.trim(),
-            timestamp: new Date().toISOString(),
-          }];
+//       if (data.transcription && data.transcription.trim()) {
+//         // Update transcriptions first
+//         setTranscriptions(prev => {
+//           const newTranscriptions = [...prev, {
+//             text: data.transcription.trim(),
+//             timestamp: new Date().toISOString(),
+//           }];
           
-          // Call processWithGPT with the updated transcriptions
-          setTimeout(() => {
-            processWithGPT();
-          }, 100); // Small delay to ensure state has updated
+//           // Call processWithGPT with the updated transcriptions
+//           setTimeout(() => {
+//             processWithGPT();
+//           }, 100); // Small delay to ensure state has updated
           
-          return newTranscriptions;
-        });
+//           return newTranscriptions;
+//         });
         
-        if (data.originalText) {
-          setOriginalTranscriptions(prev => [...prev, {
-            text: data.originalText.trim(),
-            timestamp: new Date().toISOString(),
-          }]);
-        }
-      }
-    } catch (err) {
-      console.error('Processing error:', err);
-      setError(err.message);
-    } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-    }
-  };
+//         if (data.originalText) {
+//           setOriginalTranscriptions(prev => [...prev, {
+//             text: data.originalText.trim(),
+//             timestamp: new Date().toISOString(),
+//           }]);
+//         }
+//       }
+//     } catch (err) {
+//       console.error('Processing error:', err);
+//       setError(err.message);
+//     } finally {
+//       isProcessingRef.current = false;
+//       setIsProcessing(false);
+//     }
+//   };
 
-  const collectAndProcessChunk = () => {
-    if (chunksRef.current.length === 0) return;
+//   const collectAndProcessChunk = () => {
+//     if (chunksRef.current.length === 0) return;
     
-    const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
-    chunksRef.current = [];
-    processAudioChunk(audioBlob);
-  };
+//     const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm;codecs=opus' });
+//     chunksRef.current = [];
+//     processAudioChunk(audioBlob);
+//   };
 
-  const startRecording = async () => {
-    try {
-      setError('');
-      chunksRef.current = [];
-      setTranscriptions([]);
-      setGptResponse('');
-      setNotesData(null);
-      setIsProcessingNotes(false);
-      setLastGPTCallTime(null);
+//   const startRecording = async () => {
+//     try {
+//       setError('');
+//       chunksRef.current = [];
+//       setTranscriptions([]);
+//       setGptResponse('');
+//       setNotesData(null);
+//       setIsProcessingNotes(false);
+//       setLastGPTCallTime(null);
       
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          channelCount: 1,
-          sampleRateHertz: 48000,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        } 
-      });
+//       const stream = await navigator.mediaDevices.getUserMedia({ 
+//         audio: {
+//           channelCount: 1,
+//           sampleRateHertz: 48000,
+//           echoCancellation: true,
+//           noiseSuppression: true,
+//           autoGainControl: true,
+//         } 
+//       });
 
-      streamRef.current = stream;
+//       streamRef.current = stream;
 
-      const options = {
-        mimeType: 'audio/webm;codecs=opus',
-        bitsPerSecond: 128000,
-      };
+//       const options = {
+//         mimeType: 'audio/webm;codecs=opus',
+//         bitsPerSecond: 128000,
+//       };
 
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-        throw new Error(`${options.mimeType} is not supported in this browser`);
-      }
+//       if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+//         throw new Error(`${options.mimeType} is not supported in this browser`);
+//       }
 
-      const startNewRecording = () => {
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-          mediaRecorderRef.current.stop();
-        }
+//       const startNewRecording = () => {
+//         if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+//           mediaRecorderRef.current.stop();
+//         }
 
-        const newRecorder = new MediaRecorder(stream, options);
-        newRecorder.ondataavailable = (event) => {
-          if (event.data.size > 0) {
-            chunksRef.current.push(event.data);
-          }
-        };
+//         const newRecorder = new MediaRecorder(stream, options);
+//         newRecorder.ondataavailable = (event) => {
+//           if (event.data.size > 0) {
+//             chunksRef.current.push(event.data);
+//           }
+//         };
 
-        newRecorder.onstop = collectAndProcessChunk;
+//         newRecorder.onstop = collectAndProcessChunk;
         
-        mediaRecorderRef.current = newRecorder;
-        newRecorder.start();
-      };
+//         mediaRecorderRef.current = newRecorder;
+//         newRecorder.start();
+//       };
 
-      chunkIntervalRef.current = setInterval(() => {
-        startNewRecording();
-      }, CHUNK_INTERVAL);
+//       chunkIntervalRef.current = setInterval(() => {
+//         startNewRecording();
+//       }, CHUNK_INTERVAL);
 
-      startNewRecording();
-      setIsRecording(true);
-    } catch (err) {
-      console.error('Microphone error:', err);
-      setError('Error accessing microphone: ' + err.message);
-    }
-  };
+//       startNewRecording();
+//       setIsRecording(true);
+//     } catch (err) {
+//       console.error('Microphone error:', err);
+//       setError('Error accessing microphone: ' + err.message);
+//     }
+//   };
 
 
 
-  const stopRecording = useCallback(() => {
-    console.log('Stopping recording...');
+//   const stopRecording = useCallback(() => {
+//     console.log('Stopping recording...');
     
-    if (chunkIntervalRef.current) {
-      clearInterval(chunkIntervalRef.current);
-      chunkIntervalRef.current = null;
-    }
+//     if (chunkIntervalRef.current) {
+//       clearInterval(chunkIntervalRef.current);
+//       chunkIntervalRef.current = null;
+//     }
 
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
+//     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+//       mediaRecorderRef.current.stop();
+//     }
     
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
+//     if (streamRef.current) {
+//       streamRef.current.getTracks().forEach(track => track.stop());
+//       streamRef.current = null;
+//     }
 
-    // Force immediate GPT processing when recording stops
-    console.log('Forcing final GPT processing...');
-    setLastGPTCallTime(null); // Reset the timer to ensure processing
-    setTimeout(() => {
-      processWithGPT();
-    }, 100); // Small delay to ensure state has updated
+//     // Force immediate GPT processing when recording stops
+//     console.log('Forcing final GPT processing...');
+//     setLastGPTCallTime(null); // Reset the timer to ensure processing
+//     setTimeout(() => {
+//       processWithGPT();
+//     }, 100); // Small delay to ensure state has updated
     
-    setIsRecording(false);
-  }, [transcriptions]); // Add transcriptions to dependency array
+//     setIsRecording(false);
+//   }, [transcriptions]); // Add transcriptions to dependency array
 
 
-  useEffect(() => {
-    return () => {
-      if (chunkIntervalRef.current) {
-        clearInterval(chunkIntervalRef.current);
-      }
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
+//   useEffect(() => {
+//     return () => {
+//       if (chunkIntervalRef.current) {
+//         clearInterval(chunkIntervalRef.current);
+//       }
+//       if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+//         mediaRecorderRef.current.stop();
+//       }
+//       if (streamRef.current) {
+//         streamRef.current.getTracks().forEach(track => track.stop());
+//       }
+//     };
+//   }, []);
 
 
 
 
 
   
-  return (
-    <div className="max-w-4xl mx-auto p-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Real-time Speech Transcription & Translation</span>
-            <div className="flex items-center gap-4">
-              <Languages className="h-6 w-6 text-gray-500" />
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <Alert variant="destructive" className="mb-4">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
+//   return (
+//     <div className="max-w-4xl mx-auto p-4">
+//       <Card>
+//         <CardHeader>
+//           <CardTitle className="flex items-center justify-between">
+//             <span>Real-time Speech Transcription & Translation</span>
+//             <div className="flex items-center gap-4">
+//               <Languages className="h-6 w-6 text-gray-500" />
+//             </div>
+//           </CardTitle>
+//         </CardHeader>
+//         <CardContent>
+//           {error && (
+//             <Alert variant="destructive" className="mb-4">
+//               <AlertDescription>{error}</AlertDescription>
+//             </Alert>
+//           )}
           
-          <div className="space-y-4">
-            <div className="flex items-center justify-center gap-4">
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Input Language</p>
-                <LanguageSelector onLanguageChange={handleInputLanguageChange} defaultValue={inputLanguage} />
-              </div>
-              <ArrowRight className="h-4 w-4 mt-6 text-gray-400" />
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Output Language</p>
-                <LanguageSelector onLanguageChange={handleOutputLanguageChange} defaultValue={outputLanguage} />
-              </div>
-            </div>
+//           <div className="space-y-4">
+//             <div className="flex items-center justify-center gap-4">
+//               <div>
+//                 <p className="text-sm text-gray-500 mb-1">Input Language</p>
+//                 <LanguageSelector onLanguageChange={handleInputLanguageChange} defaultValue={inputLanguage} />
+//               </div>
+//               <ArrowRight className="h-4 w-4 mt-6 text-gray-400" />
+//               <div>
+//                 <p className="text-sm text-gray-500 mb-1">Output Language</p>
+//                 <LanguageSelector onLanguageChange={handleOutputLanguageChange} defaultValue={outputLanguage} />
+//               </div>
+//             </div>
 
-            <div className="flex justify-center mt-4">
-              <Button 
-                onClick={isRecording ? stopRecording : startRecording}
-                variant={isRecording ? "destructive" : "default"}
-                className="flex items-center gap-2"
-              >
-                {isRecording ? (
-                  <>
-                    <MicOff className="h-4 w-4" />
-                    Stop Recording
-                  </>
-                ) : (
-                  <>
-                    <Mic className="h-4 w-4" />
-                    Start Recording
-                  </>
-                )}
-              </Button>
-            </div>
+//             <div className="flex justify-center mt-4">
+//               <Button 
+//                 onClick={isRecording ? stopRecording : startRecording}
+//                 variant={isRecording ? "destructive" : "default"}
+//                 className="flex items-center gap-2"
+//               >
+//                 {isRecording ? (
+//                   <>
+//                     <MicOff className="h-4 w-4" />
+//                     Stop Recording
+//                   </>
+//                 ) : (
+//                   <>
+//                     <Mic className="h-4 w-4" />
+//                     Start Recording
+//                   </>
+//                 )}
+//               </Button>
+//             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {inputLanguage !== outputLanguage && (
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-2">
-                    Original ({inputLanguage}):
-                  </h3>
-                  {isProcessing && (
-                    <div className="flex items-center gap-2 text-gray-500 italic mb-2">
-                      <span className="animate-pulse">Processing audio...</span>
-                    </div>
-                  )}
-                  <div className="whitespace-pre-wrap space-y-2">
-                    {originalTranscriptions.length > 0 ? (
-                      originalTranscriptions.map((transcript, index) => (
-                        <div key={transcript.timestamp}>
-                          {index === activeOriginalIndex ? (
-                            <TypewriterText 
-                              text={transcript.text} 
-                              speed={30} 
-                              delay={0}
-                            />
-                          ) : (
-                            <p>{transcript.text}</p>
-                          )}
-                        </div>
-                      ))
-                    ) : (
-                      'Original transcription will appear here...'
-                    )}
-                  </div>
-                </div>
-              )}
+//             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+//               {inputLanguage !== outputLanguage && (
+//                 <div className="p-4 bg-gray-50 rounded-lg">
+//                   <h3 className="text-lg font-semibold mb-2">
+//                     Original ({inputLanguage}):
+//                   </h3>
+//                   {isProcessing && (
+//                     <div className="flex items-center gap-2 text-gray-500 italic mb-2">
+//                       <span className="animate-pulse">Processing audio...</span>
+//                     </div>
+//                   )}
+//                   <div className="whitespace-pre-wrap space-y-2">
+//                     {originalTranscriptions.length > 0 ? (
+//                       originalTranscriptions.map((transcript, index) => (
+//                         <div key={transcript.timestamp}>
+//                           {index === activeOriginalIndex ? (
+//                             <TypewriterText 
+//                               text={transcript.text} 
+//                               speed={30} 
+//                               delay={0}
+//                             />
+//                           ) : (
+//                             <p>{transcript.text}</p>
+//                           )}
+//                         </div>
+//                       ))
+//                     ) : (
+//                       'Original transcription will appear here...'
+//                     )}
+//                   </div>
+//                 </div>
+//               )}
 
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-semibold mb-2">
-                  {inputLanguage === outputLanguage ? 
-                    'Transcription:' : 
-                    `Translation (${outputLanguage}):`
-                  }
-                </h3>
-                {isProcessing && (
-                  <div className="flex items-center gap-2 text-gray-500 italic mb-2">
-                    <span className="animate-pulse">Processing audio...</span>
-                  </div>
-                )}
-                <div className="whitespace-pre-wrap space-y-2">
-                {transcriptions.length > 0 ? (
-                    transcriptions.map((transcript) => (
-                    <p key={transcript.timestamp}>
-                        {transcript.text}
-                    </p>
-                    ))
-                ) : (
-                    'Transcription will appear here...'
-                )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-
-      {/* GPT Response Card */}
-      <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>AI Assistant Response</span>
-            <BookOpen className="h-6 w-6 text-gray-500" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isProcessingGPT ? (
-            <div className="flex items-center gap-2 text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Processing with AI Assistant...</span>
-            </div>
-          ) : gptResponse ? (
-            <div className="whitespace-pre-wrap">
-            {gptResponse}
-          </div>
-        ) : (
-          <div className="text-gray-500">
-            AI Assistant response will appear here...
-          </div>
-        )}
-        </CardContent>
-        </Card>
+//               <div className="p-4 bg-gray-50 rounded-lg">
+//                 <h3 className="text-lg font-semibold mb-2">
+//                   {inputLanguage === outputLanguage ? 
+//                     'Transcription:' : 
+//                     `Translation (${outputLanguage}):`
+//                   }
+//                 </h3>
+//                 {isProcessing && (
+//                   <div className="flex items-center gap-2 text-gray-500 italic mb-2">
+//                     <span className="animate-pulse">Processing audio...</span>
+//                   </div>
+//                 )}
+//                 <div className="whitespace-pre-wrap space-y-2">
+//                 {transcriptions.length > 0 ? (
+//                     transcriptions.map((transcript) => (
+//                     <p key={transcript.timestamp}>
+//                         {transcript.text}
+//                     </p>
+//                     ))
+//                 ) : (
+//                     'Transcription will appear here...'
+//                 )}
+//                 </div>
+//               </div>
+//             </div>
+//           </div>
+//         </CardContent>
+//       </Card>
 
 
-     {/* Notes Card */}
-     <Card className="mt-4">
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Lecture Notes</span>
-            <BookOpen className="h-6 w-6 text-gray-500" />
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isProcessingNotes ? (
-            <div className="flex items-center justify-center gap-2 text-gray-500 p-4">
-              <Loader2 className="h-6 w-6 animate-spin" />
-              <span>Generating structured notes...</span>
-            </div>
-          ) : notesData ? (
-            <DynamicLectureNotes lectureData={notesData} />
-          ) : isRecording ? (
-            <div className="text-gray-500 text-center p-4">
-              Notes will be generated when recording stops...
-            </div>
-          ) : (
-            <div className="text-gray-500 text-center p-4">
-              Start recording to generate notes
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
+//       {/* GPT Response Card */}
+//       <Card className="mt-4">
+//         <CardHeader>
+//           <CardTitle className="flex items-center justify-between">
+//             <span>AI Assistant Response</span>
+//             <BookOpen className="h-6 w-6 text-gray-500" />
+//           </CardTitle>
+//         </CardHeader>
+//         <CardContent>
+//           {isProcessingGPT ? (
+//             <div className="flex items-center gap-2 text-gray-500">
+//               <Loader2 className="h-4 w-4 animate-spin" />
+//               <span>Processing with AI Assistant...</span>
+//             </div>
+//           ) : gptResponse ? (
+//             <div className="whitespace-pre-wrap">
+//             {gptResponse}
+//           </div>
+//         ) : (
+//           <div className="text-gray-500">
+//             AI Assistant response will appear here...
+//           </div>
+//         )}
+//         </CardContent>
+//         </Card>
 
 
-export default SpeechTranscription;
+//      {/* Notes Card */}
+//      <Card className="mt-4">
+//         <CardHeader>
+//           <CardTitle className="flex items-center justify-between">
+//             <span>Lecture Notes</span>
+//             <BookOpen className="h-6 w-6 text-gray-500" />
+//           </CardTitle>
+//         </CardHeader>
+//         <CardContent>
+//           {isProcessingNotes ? (
+//             <div className="flex items-center justify-center gap-2 text-gray-500 p-4">
+//               <Loader2 className="h-6 w-6 animate-spin" />
+//               <span>Generating structured notes...</span>
+//             </div>
+//           ) : notesData ? (
+//             <DynamicLectureNotes lectureData={notesData} />
+//           ) : isRecording ? (
+//             <div className="text-gray-500 text-center p-4">
+//               Notes will be generated when recording stops...
+//             </div>
+//           ) : (
+//             <div className="text-gray-500 text-center p-4">
+//               Start recording to generate notes
+//             </div>
+//           )}
+//         </CardContent>
+//       </Card>
+//     </div>
+//   );
+// };
+
+
+// export default SpeechTranscription;
