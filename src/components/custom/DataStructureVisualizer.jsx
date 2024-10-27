@@ -308,7 +308,11 @@ const DataStructureVisualizer = ({
         <CardTitle>{name}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center space-x-2">
+
+        {/* Removed the buttons  */}
+
+
+        {/* <div className="flex items-center space-x-2">
           {type === 'hashMap' && (
             <Input
               value={newKey}
@@ -338,7 +342,7 @@ const DataStructureVisualizer = ({
           </Button>
         </div>
 
-        {error && <div className="text-red-500 text-sm">{error}</div>}
+        {error && <div className="text-red-500 text-sm">{error}</div>} */}
 
         <div className="border-t pt-4">
           {type === 'bst' && renderBST()}

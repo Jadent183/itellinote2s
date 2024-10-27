@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mic, MicOff, Languages, ArrowRight, BookOpen } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-//import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import DataStructureVisualizer from './DataStructureVisualizer';
 import LanguageSelector from './LanguageSelector';
 import NotesDisplay from './NotesDisplay';
+import LectureNotesVisualizer from './LectureNotesVisualizer';
+import DynamicLectureNotes from './DynamicLectureNotes';
 
 const CHUNK_INTERVAL = 5000;
 
@@ -258,6 +260,38 @@ const handleInputLanguageChange = (langCode) => {
 //   };
 
 
+const lectureData = {
+    "content": [
+      "Introduction:",
+      "Binary Search is a fundamental, efficient search algorithm for sorted arrays or lists.",
+      "It offers a time complexity of O(log n), significantly faster than linear search.",
+      "Basic Idea:",
+      "Instead of examining each element, Binary Search divides the list in half to reduce the search space.",
+      "Search Process:",
+      "1. Identify the Middle Element: Calculate the midpoint using (low + high) / 2.",
+      "2. Comparison: If the target equals the middle element, the search is complete.",
+      "   - If smaller, search continues in the left half.",
+      "   - If larger, focus shifts to the right half.",
+      "3. Repeat: Halving continues until the target is found or no search space remains.",
+      "Example:",
+      "For the sorted list [1, 3, 5, 7, 9, 11, 13, 15]:",
+      "Searching for 9 involved comparisons with elements 7, 11, and finally 9. Found in 3 comparisons, showing efficiency over linear search.",
+      "Efficiency:",
+      "Demonstrates the power of Binary Search, utilizing a divide-and-conquer strategy to achieve O(log n) time complexity."
+    ],
+    "data-structures": [
+        {
+          type: "array",
+          initialValues: [3, 8, 1, 4, 6]
+        },
+        {
+          type: "bst",
+          initialValues: [1, 2, 3, 4, 5]
+        }
+      ],
+    "subject": "Binary Search"
+  };
+
 
   return (
     <div className="max-w-4xl mx-auto p-4">
@@ -362,6 +396,27 @@ const handleInputLanguageChange = (langCode) => {
             </div>
           </div>
         </CardContent>
+
+
+
+
+      </Card>
+
+      <div className="max-w-4xl mx-auto p-4" />
+
+
+      <Card>
+
+          <CardContent>
+                    <DynamicLectureNotes lectureData={lectureData}/>
+              {/* <LectureNotesVisualizer /> */}
+              {/* <DataStructureVisualizer
+                  type="bst"
+                  defaultValues="11,4,8,1,9"  // Values will be automatically sorted
+                  name="Binary Search Tree"
+                  /> */}
+
+            </CardContent>
       </Card>
     </div>
   );
