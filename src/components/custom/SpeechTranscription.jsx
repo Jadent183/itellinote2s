@@ -3,9 +3,11 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Mic, MicOff, Languages, ArrowRight } from 'lucide-react';
+import { Mic, MicOff, Languages, ArrowRight, BookOpen } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+//import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import LanguageSelector from './LanguageSelector';
+import NotesDisplay from './NotesDisplay';
 
 const CHUNK_INTERVAL = 5000;
 
@@ -13,6 +15,8 @@ const SpeechTranscription = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcriptions, setTranscriptions] = useState([]);
   const [originalTranscriptions, setOriginalTranscriptions] = useState([]);
+  const [notes, setNotes] = useState('');
+  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [inputLanguage, setInputLanguage] = useState('en-US');
@@ -24,7 +28,8 @@ const SpeechTranscription = () => {
   const chunkIntervalRef = useRef(null);
   const isProcessingRef = useRef(false);
 
-  
+
+
   const processAudioChunk = async (audioBlob) => {
     if (isProcessingRef.current) return;
     
@@ -216,6 +221,41 @@ const handleInputLanguageChange = (langCode) => {
     setTranscriptions([]);
     setOriginalTranscriptions([]);
   };
+
+
+//   const generateNotes = async () => {
+//     try {
+//       setIsGeneratingNotes(true);
+      
+//       // Get the complete transcription text
+//       const transcriptionText = transcriptions
+//         .map(t => t.text)
+//         .join(' ');
+
+//       const response = await fetch('/api/generate-notes', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           transcription: transcriptionText,
+//           language: outputLanguage,
+//         }),
+//       });
+
+//       if (!response.ok) {
+//         throw new Error('Failed to generate notes');
+//       }
+
+//       const data = await response.json();
+//       setNotes(data.notes);
+//     } catch (err) {
+//       console.error('Notes generation error:', err);
+//       setError('Failed to generate notes: ' + err.message);
+//     } finally {
+//       setIsGeneratingNotes(false);
+//     }
+//   };
 
 
 
