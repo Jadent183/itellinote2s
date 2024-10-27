@@ -9,6 +9,47 @@ const QuizSection = ({ quizzes = [] }) => {
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
 
+  // Improved quiz data parsing
+  const parseQuizData = (quiz) => {
+    const realAnswer = quiz['real-answer'];
+    let falseAnswers = [];
+
+    // Handle different formats of false answers
+    if (typeof quiz['false-answers'] === 'string') {
+      // First try splitting by comma if present
+      if (quiz['false-answers'].includes(',')) {
+        falseAnswers = quiz['false-answers']
+          .split(',')
+          .map(answer => answer.trim())
+          .filter(answer => answer.length > 0);
+      } 
+      // Then try splitting by period if no commas found
+      else if (quiz['false-answers'].includes('.')) {
+        falseAnswers = quiz['false-answers']
+          .split('.')
+          .map(answer => answer.trim())
+          .filter(answer => answer.length > 0);
+      }
+      // If no delimiters found, treat as single answer
+      else {
+        falseAnswers = [quiz['false-answers'].trim()];
+      }
+    } else if (Array.isArray(quiz['false-answers'])) {
+      falseAnswers = quiz['false-answers'].filter(answer => answer && answer.trim().length > 0);
+    } else if (quiz['false-answer']) {
+      falseAnswers = [quiz['false-answer']];
+    }
+
+    // Ensure we have unique answers
+    const uniqueAnswers = new Set([realAnswer, ...falseAnswers]);
+    const parsedAnswers = Array.from(uniqueAnswers);
+
+    return {
+      ...quiz,
+      parsedAnswers
+    };
+  };
+
   const handleAnswer = (index, selectedAnswer) => {
     if (!showResults) {
       setAnswers(prev => ({
@@ -52,6 +93,20 @@ const QuizSection = ({ quizzes = [] }) => {
     return 'opacity-50';
   };
 
+  // Improved grid columns calculation
+  const getGridCols = (answersCount) => {
+    switch (answersCount) {
+      case 2:
+        return 'grid-cols-1 md:grid-cols-2';
+      case 3:
+        return 'grid-cols-1 md:grid-cols-3';
+      case 4:
+        return 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4';
+      default:
+        return 'grid-cols-1 md:grid-cols-2';
+    }
+  };
+
   return (
     <Card className="mt-8">
       <CardHeader>
@@ -65,40 +120,45 @@ const QuizSection = ({ quizzes = [] }) => {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        {quizzes.map((quiz, index) => (
-          <div key={index} className="space-y-4">
-            <h3 className="text-lg font-medium">{quiz.question}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {[quiz['real-answer'], quiz['false-answer']].sort().map((answer) => (
-                <Button
-                  key={answer}
-                  variant="outline"
-                  className={`relative h-auto py-4 px-6 justify-start text-left ${getButtonStyle(index, answer)}`}
-                  onClick={() => handleAnswer(index, answer)}
-                  disabled={showResults}
-                >
-                  <span>{answer}</span>
-                  {showResults && answer === answers[index] && (
-                    <span className="absolute right-4">
-                      {answer === quiz['real-answer'] ? (
-                        <CheckCircle2 className="w-5 h-5 text-green-500" />
-                      ) : (
-                        <XCircle className="w-5 h-5 text-red-500" />
-                      )}
-                    </span>
-                  )}
-                </Button>
-              ))}
+        {quizzes.map((quiz, index) => {
+          const parsedQuiz = parseQuizData(quiz);
+          const shuffledAnswers = [...parsedQuiz.parsedAnswers].sort(() => Math.random() - 0.5);
+          
+          return (
+            <div key={index} className="space-y-4">
+              <h3 className="text-lg font-medium">{quiz.question}</h3>
+              <div className={`grid ${getGridCols(shuffledAnswers.length)} gap-4`}>
+                {shuffledAnswers.map((answer, answerIndex) => (
+                  <Button
+                    key={`${index}-${answerIndex}-${answer}`}
+                    variant="outline"
+                    className={`relative h-auto py-4 px-6 justify-start text-left ${getButtonStyle(index, answer)}`}
+                    onClick={() => handleAnswer(index, answer)}
+                    disabled={showResults}
+                  >
+                    <span className="pr-8">{answer}</span>
+                    {showResults && answer === answers[index] && (
+                      <span className="absolute right-4">
+                        {answer === quiz['real-answer'] ? (
+                          <CheckCircle2 className="w-5 h-5 text-green-500" />
+                        ) : (
+                          <XCircle className="w-5 h-5 text-red-500" />
+                        )}
+                      </span>
+                    )}
+                  </Button>
+                ))}
+              </div>
+              {showResults && answers[index] !== quiz['real-answer'] && (
+                <Alert>
+                  <AlertDescription>
+                    The correct answer is: {quiz['real-answer']}
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
-            {showResults && answers[index] !== quiz['real-answer'] && (
-              <Alert>
-                <AlertDescription>
-                  The correct answer is: {quiz['real-answer']}
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-        ))}
+          );
+        })}
 
         <div className="pt-4 flex justify-end">
           {!showResults ? (

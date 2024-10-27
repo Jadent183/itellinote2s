@@ -37,47 +37,25 @@ const LANGUAGE_MAPPING = {
 };
 
 export async function POST(req) {
-  if (!speechClient || !translationClient) {
-    console.error('Clients not initialized');
-    return new Response(
-      JSON.stringify({ error: 'API clients not properly initialized' }),
-      { status: 500 }
-    );
-  }
-
   try {
-    const data = await req.formData();
-    const audio = data.get('audio');
-    const inputLanguage = data.get('inputLanguage');
-    const outputLanguage = data.get('outputLanguage');
-
-    console.log('Received request with languages:', { 
-      inputLanguage, 
-      outputLanguage,
-      hasAudio: !!audio 
-    });
-
-    if (!audio) {
-      return new Response(
-        JSON.stringify({ error: 'No audio file provided' }),
-        { status: 400 }
-      );
+    if (!speechClient || !translationClient) {
+      throw new Error('API clients not properly initialized');
     }
 
-    if (!inputLanguage || !outputLanguage) {
-      return new Response(
-        JSON.stringify({ error: 'Language settings not provided' }),
-        { status: 400 }
-      );
+    const formData = await req.formData();
+    const audio = formData.get('audio');
+    const inputLanguage = formData.get('inputLanguage') || 'en-US';
+    const outputLanguage = formData.get('outputLanguage') || 'en-US';
+
+    if (!audio) {
+      throw new Error('No audio file provided');
     }
 
     const buffer = Buffer.from(await audio.arrayBuffer());
 
-    // Always transcribe in input language
-    const transcribeRequest = {
-      audio: {
-        content: buffer.toString('base64'),
-      },
+    // Transcribe the audio
+    const [transcribeResponse] = await speechClient.recognize({
+      audio: { content: buffer.toString('base64') },
       config: {
         encoding: 'WEBM_OPUS',
         sampleRateHertz: 48000,
@@ -86,23 +64,27 @@ export async function POST(req) {
         enableAutomaticPunctuation: true,
         useEnhanced: true,
       },
-    };
+    });
 
-    console.log('Sending transcription request in language:', inputLanguage);
-    const [transcribeResponse] = await speechClient.recognize(transcribeRequest);
-    
-    if (!transcribeResponse.results || transcribeResponse.results.length === 0) {
+    if (!transcribeResponse.results?.length) {
       return new Response(
-        JSON.stringify({ error: 'No transcription results' }),
-        { status: 404 }
+        JSON.stringify({ 
+          transcription: '',
+          originalText: '',
+          inputLanguage,
+          outputLanguage,
+          message: 'No transcription results'
+        }),
+        { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
 
     const originalText = transcribeResponse.results
       .map(result => result.alternatives[0].transcript)
       .join(' ');
-
-    console.log('Original transcription:', originalText);
 
     // If languages are the same, return without translation
     if (inputLanguage === outputLanguage) {
@@ -113,37 +95,23 @@ export async function POST(req) {
           inputLanguage,
           outputLanguage
         }),
-        { status: 200 }
+        { 
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        }
       );
     }
 
     // Translate if languages are different
-    const translateRequest = {
+    const [translateResponse] = await translationClient.translateText({
       parent: `projects/${process.env.GOOGLE_PROJECT_ID}/locations/global`,
       contents: [originalText],
       mimeType: 'text/plain',
       sourceLanguageCode: LANGUAGE_MAPPING[inputLanguage],
       targetLanguageCode: LANGUAGE_MAPPING[outputLanguage],
-    };
-
-    console.log('Sending translation request:', {
-      source: LANGUAGE_MAPPING[inputLanguage],
-      target: LANGUAGE_MAPPING[outputLanguage],
-      text: originalText
     });
-
-    const [translateResponse] = await translationClient.translateText(translateRequest);
-    
-    if (!translateResponse.translations || translateResponse.translations.length === 0) {
-      throw new Error('No translation result');
-    }
 
     const translatedText = translateResponse.translations[0].translatedText;
-
-    console.log('Translation result:', {
-      original: originalText,
-      translated: translatedText,
-    });
 
     return new Response(
       JSON.stringify({ 
@@ -152,17 +120,23 @@ export async function POST(req) {
         inputLanguage,
         outputLanguage
       }),
-      { status: 200 }
+      { 
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
 
   } catch (error) {
-    console.error('Error in transcribe API:', error);
+    console.error('API Error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,
         details: error.stack
       }),
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      }
     );
   }
 }

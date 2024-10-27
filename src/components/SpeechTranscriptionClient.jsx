@@ -12,6 +12,7 @@ const SpeechTranscriptionClient = () => {
   const [inputLanguage, setInputLanguage] = useState('en-US');
   const [outputLanguage, setOutputLanguage] = useState('en-US');
   const [completeTranscription, setCompleteTranscription] = useState('');
+  const [completeTranslation, setCompleteTranslation] = useState('');
 
   const { 
     isProcessingGPT, 
@@ -22,80 +23,103 @@ const SpeechTranscriptionClient = () => {
     threadId 
   } = useGPTProcessing();
 
-  // Debug effect for language changes
-  useEffect(() => {
-    console.log('Languages updated:', { inputLanguage, outputLanguage });
-  }, [inputLanguage, outputLanguage]);
-
   const handleTranscriptionUpdate = useCallback((data) => {
     console.log('Received transcription data:', data);
 
     if (data.originalText?.trim() || data.transcription?.trim()) {
-      if (inputLanguage !== outputLanguage) {
-        // When languages are different, handle both original and translated text
-        if (data.originalText?.trim()) {
-          setOriginalTranscriptions(prev => [...prev, {
-            text: data.originalText.trim(),
-            timestamp: new Date().toISOString(),
-          }]);
-          
-          // Update complete transcription with original text
-          setCompleteTranscription(prev => {
-            const newText = data.originalText.trim();
-            return prev ? `${prev} ${newText}` : newText;
-          });
-        }
+      // Handle original text
+      if (data.originalText?.trim()) {
+        setOriginalTranscriptions(prev => [...prev, {
+          text: data.originalText.trim(),
+          timestamp: new Date().toISOString(),
+        }]);
         
-        if (data.transcription?.trim()) {
-          setTranscriptions(prev => [...prev, {
-            text: data.transcription.trim(),
-            timestamp: new Date().toISOString(),
-          }]);
-        }
-      } else {
-        // When languages are the same, use transcription for both
-        const transcriptionText = data.transcription?.trim();
-        if (transcriptionText) {
-          setTranscriptions(prev => [...prev, {
-            text: transcriptionText,
-            timestamp: new Date().toISOString(),
-          }]);
-          
-          // Update complete transcription
-          setCompleteTranscription(prev => {
-            return prev ? `${prev} ${transcriptionText}` : transcriptionText;
+        // Update complete original transcription
+        setCompleteTranscription(prev => {
+          const newText = data.originalText.trim();
+          return prev ? `${prev} ${newText}` : newText;
+        });
+      }
+
+      // Handle translated/transcribed text
+      if (data.transcription?.trim()) {
+        setTranscriptions(prev => [...prev, {
+          text: data.transcription.trim(),
+          timestamp: new Date().toISOString(),
+        }]);
+
+        // Update complete translation for different languages
+        if (inputLanguage !== outputLanguage) {
+          setCompleteTranslation(prev => {
+            const newText = data.transcription.trim();
+            return prev ? `${prev} ${newText}` : newText;
           });
         }
       }
     }
   }, [inputLanguage, outputLanguage]);
 
-const handleInputLanguageChange = useCallback((langCode) => {
-  console.log('Input language changing to:', langCode);
-  setInputLanguage(langCode);
-  setTranscriptions([]);
-  setOriginalTranscriptions([]);
-  setCompleteTranscription('');
-}, []);
+  const handleInputLanguageChange = useCallback((langCode) => {
+    console.log('Changing input language to:', langCode);
+    setInputLanguage(langCode);
+    // Clear transcriptions when input language changes
+    setOriginalTranscriptions([]);
+    setTranscriptions([]);
+    setCompleteTranscription('');
+    setCompleteTranslation('');
+  }, []);
 
-const handleOutputLanguageChange = useCallback((langCode) => {
-  console.log('Output language changing to:', langCode);
-  setOutputLanguage(langCode);
-  setTranscriptions([]);
-  setOriginalTranscriptions([]);
-  setCompleteTranscription('');
-}, []);
-
-const handleRecordingStop = useCallback(() => {
-  if (completeTranscription) {
-    // If languages are different and we have translations, use the translated text
-    const translatedText = inputLanguage !== outputLanguage ? 
-      transcriptions.map(t => t.text).join(' ') :
-      completeTranscription;
+  const handleOutputLanguageChange = useCallback(async (langCode) => {
+    console.log('Changing output language to:', langCode);
+    setOutputLanguage(langCode);
     
-    processWithGPT(translatedText);
-  }
-}, [completeTranscription, processWithGPT, inputLanguage, outputLanguage, transcriptions]);
+    // If there's existing content, translate it
+    if (completeTranscription && langCode !== inputLanguage) {
+      try {
+        const response = await fetch('/api/translate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            text: completeTranscription,
+            inputLanguage,
+            outputLanguage: langCode,
+          }),
+        });
+
+        if (response.ok) {
+          const { translatedText } = await response.json();
+          setCompleteTranslation(translatedText);
+          setTranscriptions([{
+            text: translatedText,
+            timestamp: new Date().toISOString(),
+          }]);
+        }
+      } catch (error) {
+        console.error('Translation error:', error);
+      }
+    } else if (langCode === inputLanguage) {
+      // Reset translation when languages match
+      setCompleteTranslation('');
+      setTranscriptions(originalTranscriptions);
+    }
+  }, [completeTranscription, inputLanguage]);
+
+  const handleRecordingStop = useCallback(() => {
+    // Use translated text for GPT when languages are different
+    const textForGPT = inputLanguage !== outputLanguage ? 
+      completeTranslation : 
+      completeTranscription;
+
+    if (textForGPT) {
+      console.log('Processing with GPT:', {
+        usingTranslation: inputLanguage !== outputLanguage,
+        text: textForGPT
+      });
+      processWithGPT(textForGPT);
+    }
+  }, [completeTranscription, completeTranslation, inputLanguage, outputLanguage, processWithGPT]);
 
   const {
     isRecording,
@@ -103,7 +127,8 @@ const handleRecordingStop = useCallback(() => {
     error,
     startRecording,
     stopRecording: baseStopRecording,
-    cleanup
+    cleanup,
+    audioStream
   } = useAudioProcessing({
     onTranscriptionUpdate: handleTranscriptionUpdate,
     inputLanguage,
@@ -133,6 +158,7 @@ const handleRecordingStop = useCallback(() => {
         isProcessing={isProcessing}
         originalTranscriptions={originalTranscriptions}
         transcriptions={transcriptions}
+        audioStream={audioStream}
       />
 
       <LectureNotesCard
