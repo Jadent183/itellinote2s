@@ -24,7 +24,6 @@ const SpeechTranscription = () => {
   const chunkIntervalRef = useRef(null);
   const isProcessingRef = useRef(false);
 
-
   
   const processAudioChunk = async (audioBlob) => {
     if (isProcessingRef.current) return;
