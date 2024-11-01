@@ -1,4 +1,8 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# IntelliNote
+
+**IntelliNote** is a real-time lecture transcription and learning tool. It captures audio from your device and generates notes, quizzes, and diagrams based on the audio you provide. IntelliNote utilizes Google Translate to translate to or from most languages instantly. 
+
+
 
 ## Getting Started
 
@@ -20,17 +24,10 @@ You can start editing the page by modifying `app/page.js`. The page auto-updates
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-## Learn More
+## Screenshots
+![Screenshot 2024-10-27 095053](https://github.com/user-attachments/assets/36260ec1-e807-4b0f-9a8e-c69d5c926dc3)
 
-To learn more about Next.js, take a look at the following resources:
+![Screenshot 2024-10-27 112811](https://github.com/user-attachments/assets/c9ac9792-3a53-4672-84d2-88c5dfc092eb)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+![Screenshot 2024-10-27 112821](https://github.com/user-attachments/assets/75e5825c-3629-4654-948c-318f241791b4)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
